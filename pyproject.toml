@@ -1,0 +1,38 @@
+[project]
+name = "single-cell-fm-probing"
+version = "0.1.0"
+description = "Do single-cell foundation models learn biology beyond highly-expressed genes? A layer-resolved geometry-and-probe study adjudicating the scGPT/Geneformer/UCE-vs-HVG-PCA dispute."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Core numerics / probes
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "xgboost>=2.1",
+    "umap-learn>=0.5.12",
+    # Pin the numba/llvmlite stack to Python-3.12-compatible versions
+    # (unpinned, uv backtracks to llvmlite 0.36 which is Python <3.10 only).
+    "numba>=0.61",
+    "llvmlite>=0.44",
+    "pynndescent>=0.6",
+    "hdbscan>=0.8.38",
+    "matplotlib>=3.11.0",
+    "rich>=13.7",
+    "jupyter>=1.1",
+    "notebook>=7.2",
+    # Single-cell data + baselines
+    "scanpy>=1.10",
+    "anndata>=0.10",
+    "scvi-tools>=1.1",
+    # Foundation models
+    "torch>=2.2",
+    "transformers>=4.44",
+    "huggingface-hub>=0.24",
+    # Geneformer is installed from its HF repo (git); scGPT + UCE are vendored /
+    # installed per stage 02 to keep the base install clean -- see docs/DESIGN.md.
+]
+
+# NOTE: scGPT and UCE bring heavier / version-sensitive deps (flash-attn optional
+# for scGPT; UCE ships precomputed ESM-2 gene-embedding tables). These are added
+# behind their own stage-02 extractors, not in the base install.
