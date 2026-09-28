@@ -26,27 +26,48 @@ def linear_cka(X: np.ndarray, Y: np.ndarray) -> float:
     return float(xy / (xx * yy)) if xx * yy > 0 else float("nan")
 
 
-def svcca(Xa: np.ndarray, Xb: np.ndarray, var: float = 0.99,
-          max_rows: int = 5000, seed: int = 42) -> float:
-    """SVD-denoise each representation to `var` energy, then mean CCA correlation."""
-    rng = np.random.default_rng(seed)
-    n = Xa.shape[0]
+def svcca_reduce(X: np.ndarray, var: float = 0.99,
+                 max_rows: int = 5000, seed: int = 42) -> np.ndarray:
+    """The per-matrix half of SVCCA: subsample rows, centre, SVD-denoise, orthonormalise.
+
+    Split out so a layer grid can reduce each layer ONCE instead of once per partner. The row
+    subsample is seeded and depends only on n, so reductions computed separately still align
+    row-for-row -- which is what makes caching safe.
+
+    On a 34x49 grid this is 83 reductions instead of 3,332; the SVD dominates svcca's cost, so
+    the grid gets roughly an order of magnitude cheaper.
+    """
+    X = np.asarray(X, dtype=np.float64)
+    n = X.shape[0]
     if n > max_rows and max_rows > 0:
-        idx = rng.choice(n, max_rows, replace=False)
-        Xa, Xb = Xa[idx], Xb[idx]
+        X = X[np.random.default_rng(seed).choice(n, max_rows, replace=False)]
+    Xc = X - X.mean(0, keepdims=True)
+    U, S, _ = np.linalg.svd(Xc, full_matrices=False)
+    total = np.sum(S ** 2)
+    if not np.isfinite(total) or total <= 0:
+        return np.zeros((Xc.shape[0], 0))
+    k = int(np.searchsorted(np.cumsum(S ** 2) / total, var) + 1)
+    Q, _ = np.linalg.qr(U[:, :k] * S[:k])
+    return Q
 
-    def _reduce(X: np.ndarray) -> np.ndarray:
-        Xc = X - X.mean(0, keepdims=True)
-        U, S, _ = np.linalg.svd(Xc, full_matrices=False)
-        energy = np.cumsum(S ** 2) / np.sum(S ** 2)
-        k = int(np.searchsorted(energy, var) + 1)
-        return U[:, :k] * S[:k]
 
-    A, B = _reduce(Xa), _reduce(Xb)
-    Qa, _ = np.linalg.qr(A)
-    Qb, _ = np.linalg.qr(B)
+def svcca_from_reduced(Qa: np.ndarray, Qb: np.ndarray) -> float:
+    """Mean CCA correlation between two matrices already passed through svcca_reduce."""
+    if Qa.shape[1] == 0 or Qb.shape[1] == 0:
+        return float("nan")
     s = np.linalg.svd(Qa.T @ Qb, compute_uv=False)
     return float(np.clip(s, 0, 1).mean())
+
+
+def svcca(Xa: np.ndarray, Xb: np.ndarray, var: float = 0.99,
+          max_rows: int = 5000, seed: int = 42) -> float:
+    """SVD-denoise each representation to `var` energy, then mean CCA correlation.
+
+    Note the `max_rows` cap: SVCCA is evaluated on at most 5,000 rows even when handed more,
+    so its effective sample size differs from CKA's and mutual k-NN's on the same call.
+    """
+    return svcca_from_reduced(svcca_reduce(Xa, var, max_rows, seed),
+                              svcca_reduce(Xb, var, max_rows, seed))
 
 
 def knn_purity(X: np.ndarray, labels: np.ndarray, k: int = 15,
@@ -113,3 +134,83 @@ def mutual_knn(X: np.ndarray, Y: np.ndarray, k: int = 10,
     iy = ny.kneighbors(return_distance=False)[:, 1:]
     shared = [len(set(a) & set(b)) / k for a, b in zip(ix, iy)]
     return float(np.mean(shared))
+
+
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+
+def record_params(out_dir, args=None, extra=None, filename="params.json") -> dict:
+    """Write `params.json` beside a stage's outputs, recording what produced them.
+
+    Results whose configuration is not recorded cannot safely be compared across runs.
+    A concrete example from this project: two convergence grids computed at different
+    residue budgets are not directly comparable, and nothing in `grids.npz` or the
+    figures would reveal the difference — the budget lived only in whichever shell
+    command happened to launch the stage. This function removes that failure mode by
+    making every stage self-documenting.
+
+    Captures the resolved argument namespace, the exact command line, the git commit
+    (flagged dirty if the tree has uncommitted changes), library versions whose
+    numerics affect results, and a UTC timestamp.
+
+    Args:
+        out_dir:  directory the stage writes into; created if absent.
+        args:     the argparse namespace (or any object with __dict__), optional.
+        extra:    dict of stage-specific facts worth pinning — e.g. the number of
+                  residues actually sampled, as opposed to the requested budget.
+        filename: override when several stages share one output directory (the 01*
+                  stages all write into `structures/`, so they use params_01*.json)
+                  and would otherwise overwrite each other's record.
+
+    Returns the dict it wrote, so callers may log or extend it.
+    """
+    import json
+    import subprocess
+    import sys
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    def _jsonable(v):
+        if isinstance(v, Path):
+            return str(v)
+        if isinstance(v, (list, tuple)):
+            return [_jsonable(x) for x in v]
+        if isinstance(v, dict):
+            return {str(k): _jsonable(x) for k, x in v.items()}
+        if isinstance(v, (str, int, float, bool)) or v is None:
+            return v
+        return repr(v)
+
+    def _git(*cmd, default=None):
+        try:
+            r = subprocess.run(("git", "-C", str(Path(__file__).resolve().parent)) + cmd,
+                               capture_output=True, text=True, timeout=10)
+            return r.stdout.strip() if r.returncode == 0 else default
+        except Exception:
+            return default
+
+    versions = {"python": sys.version.split()[0]}
+    for mod in ("numpy", "scipy", "sklearn", "torch", "xgboost", "umap", "biotite"):
+        try:
+            versions[mod] = __import__(mod).__version__
+        except Exception:
+            pass
+
+    payload = {
+        "script": Path(sys.argv[0]).name,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "command": " ".join(sys.argv),
+        "args": {k: _jsonable(v) for k, v in vars(args).items()} if args is not None else {},
+        "git_commit": _git("rev-parse", "HEAD", default="unknown"),
+        "git_dirty": bool(_git("status", "--porcelain", default="")),
+        "versions": versions,
+    }
+    if extra:
+        payload["extra"] = {k: _jsonable(v) for k, v in extra.items()}
+
+    (out / filename).write_text(json.dumps(payload, indent=2) + "\n")
+    return payload

@@ -1,143 +1,92 @@
 # single-cell-fm-probing
 
-**Do single-cell foundation models learn biology beyond highly-expressed genes — and where in the
-network?**
+**Do the cell states that single-cell foundation models learn stratify cancer patients better
+than a linear baseline — and does the answer survive the controls?**
 
-A layer-resolved geometry-and-probe study of single-cell foundation models (**scGPT**,
-**Geneformer**, optionally **UCE**) against the linear baselines (**HVG-PCA**, **scVI**,
-**logistic-on-HVG**) that sceptics argue still match them.
+Single-cell foundation models (scGPT, Geneformer) are trained to reconstruct masked gene
+expression across tens of millions of cells. Whether they learn biology beyond what a linear
+method on ~2,000 highly-variable genes already captures is disputed: one side reports strong
+zero-shot generalisation, the other that HVG + PCA matches or beats them. That argument has been
+had on embedding geometry and cell-type clustering. This study has it on a **clinical endpoint**.
 
-> **Status: design and literature complete; pipeline stages not yet implemented.**
-> What is in this repository today is the shared metric toolkit (`scripts/qc_common.py`), the
-> literature review that motivates the design, and the design itself. The numbered stages in
-> [Pipeline](#pipeline) are specified but not yet written. This README says so plainly rather than
-> describing a pipeline that does not exist.
+## The design in one paragraph
 
----
+Take a public breast-cancer tumour atlas. Embed every cell three ways — scGPT, Geneformer, and
+HVG-PCA as the baseline. Cluster each embedding into cell states and turn each state into a
+marker-gene signature. Score every signature in ~1,100 TCGA breast tumours (bulk RNA-seq, a
+disjoint patient cohort) and ask whether it predicts survival. Read every score against a
+**ladder**: a permutation null, a floor of random gene sets matched for size and expression, the
+HVG-PCA baseline, and the PAM50 subtype call as the reference the field already uses. The
+question is answered by the margin of the foundation models over the baseline — not by any
+number on its own.
 
-## Why this question, on this substrate
+Full design, predictions and conventions: [`docs/DESIGN.md`](docs/DESIGN.md).
+Literature and novelty: `research/literature.md`.
 
-For protein language models, "does the model encode things it was never trained on" is a **settled,
-founding result** — so any study there contributes a protocol, not a discovery. Single-cell
-foundation models are the opposite: **the answer is genuinely disputed**, and the two poles are
-both credible and recent.
+## Status
 
-- **The sceptic pole.** Kedzierska et al. (*Genome Biology* 2025) find Geneformer and scGPT are
-  frequently beaten on zero-shot cell-type clustering by plain HVG selection, scVI and Harmony.
-  Boiarsky et al. find **logistic regression on the top-2000 HVGs matches** both models across five
-  datasets. Souza & Mehta (arXiv:2602.16696) reach a similar verdict on a CZ CELLxGENE slice.
-- **The optimist pole.** UCE (Rosen et al., *Nature* 2026), trained on ~36M cells across dozens of
-  tissues and 8 species, maps *unseen* species and cell types into a coherent embedding zero-shot.
-
-So the dispute is not "is there a phenomenon" but **where, and for which properties, the foundation
-models actually beat a linear baseline**. That is a question a unified, layer-resolved protocol can
-adjudicate — which is the entire reason this repository exists.
-
-The full two-pole survey, with the interpretability literature and the novelty argument, is in
-**[`research/literature.md`](research/literature.md)**.
-
----
-
-## The design, and why each piece is there
-
-The protocol is built so that a null result is as interpretable as a positive one. Each component
-answers an objection that would otherwise sink the study:
-
-| Component | The objection it answers |
-|---|---|
-| **Layer-resolved** extraction, not just the final embedding | "You used the wrong layer." Zero-shot evaluations typically read one layer; if biology lives mid-network, a final-layer test understates the model. |
-| **Baselines embedded in the same protocol** (HVG-PCA, scVI, logistic-on-HVG) | "Your baseline was weak." The contested baselines are run through the identical pipeline, not quoted from other papers. |
-| **Geometry *and* decodability, reported separately** | The sceptics' "the UMAPs don't cluster" is a claim about *geometry*. Biology may be present but not geometrically organised — so k-NN purity / LVR / UMAP and probe accuracy are measured independently and their disagreement is a result in itself. |
-| **Expression- and HVG-stratified probes**, plus HVG ablation | This is the disputed claim stated precisely: does signal exist *beyond* highly-expressed genes, and at which layer does it appear? |
-| **Convergence toward the baseline** (CKA/SVCCA/mutual-kNN of each model's layers against HVG-PCA) | Recasts "one PCA still rules them all" as something measurable. Strong convergence to PCA supports the sceptics; a shared model subspace that PCA does *not* sit inside is the cleanest evidence against them. |
-| **Donor/dataset-grouped splits** | "Your probe memorised batch or donor." Grouped splits keep accuracy from riding on nuisance structure. |
-| **Three similarity metrics, not one** | CKA, SVCCA and mutual k-NN answer different questions (whole representation, linear subspace, local neighbourhoods) and can disagree substantially on the same pair. Reporting one invites the wrong conclusion. |
-
-Full specification — datasets, label set, per-stage detail and caveats — is in
-**[`docs/DESIGN.md`](docs/DESIGN.md)**.
-
----
-
-## The code that exists today
-
-### `scripts/qc_common.py`
-
-The shared representational-similarity toolkit. Every function takes plain `[n_samples, n_features]`
-arrays, so the same code serves gene-token embeddings, cell embeddings and baseline features
-without modification.
-
-| Function | What it computes | Why it is here |
-|---|---|---|
-| `column_center(X)` | Feature-column centering | Required before `linear_cka`; separated out so the centering is explicit and auditable rather than hidden. |
-| `linear_cka(X, Y)` | Feature-space linear CKA (Kornblith et al. 2019) | Whole-representation similarity. Sensitive to high-variance directions, which is why it is never reported alone. |
-| `svcca(Xa, Xb, var=0.99)` | SVD-denoise to `var` energy, then mean CCA correlation (Raghu et al. 2017) | Shared **linear subspace**. Note it needs a permutation null: CCA finds correlated directions between unrelated high-dimensional data, and that null grows with representation width. |
-| `mutual_knn(X, Y, k=10)` | Mean fraction of shared neighbours (Huh et al. 2024) | Whether the two representations agree on *local neighbourhoods* — a much stricter criterion than subspace overlap, and the metric of the Platonic Representation Hypothesis. |
-| `knn_purity(X, labels, k=15)` | Chance-corrected k-NN label purity | Unsupervised geometry: is a label organised in the embedding without any supervision? Chance-correction matters because label priors are badly skewed in single-cell data. |
-| `lvr(X, y, k=15)` | Local variance ratio for a continuous target | The continuous analogue of purity — how much of a continuous target's variance is explained locally. |
-
----
-
-## Setup
-
-CPU-only; no GPU required for the planned first pass.
-
-```bash
-# uv only. Override the global venv so this project gets its own environment.
-export UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm
-export UV_CACHE_DIR=/scratch/.uv-cache HF_HOME=/scratch/.hf-cache
-export TORCH_HOME=/scratch/.torch-hub TORCHDYNAMO_DISABLE=1
-cd /data/scfm
-uv sync
-```
-
-The `UV_PROJECT_ENVIRONMENT` override matters: if a machine-wide default is set in `~/.bashrc`,
-`uv sync` would otherwise install this project's dependencies into a different environment.
-
----
+Design complete. Pipeline written (`scripts/01`–`06`, orchestrator `run.py`). **Nothing has run.**
+Both data sources are public and were verified reachable on 2026-09-28.
 
 ## Pipeline
 
-**Specified, not yet implemented.** Stages are numbered and resume-safe by design: outputs guarded
-by existence checks so a re-run fills gaps rather than recomputing.
-
-| Stage | Script | Purpose |
+| Stage | Script | Does |
 |---|---|---|
-| 01 | `01_fetch_cells.py` | Download scIB `h5ad`, QC, harmonise the gene vocabulary, build a cell manifest + gene metadata. |
-| 02a | `02_extract_embeddings_scgpt.py` | scGPT per-layer per-gene and cell embeddings. |
-| 02b | `02_extract_embeddings_geneformer.py` | Geneformer per-layer embeddings. |
-| 02c | `02c_baselines.py` | HVG-PCA / scVI / logistic-on-HVG baseline features — the contested comparators. |
-| 02d | `02_extract_embeddings_uce.py` | *(optional)* UCE 4-layer embeddings (the CPU-feasible checkpoint). |
-| 03 | `03_analyze_embeddings.py` | Per-layer geometry: k-NN purity (cell type and batch), LVR, UMAP, depth law. |
-| 04 | `04_convergence.py` | CKA/SVCCA/mutual-kNN layer × layer, cross-model **and** model ↔ HVG-PCA. |
-| 05 | `05_property_prediction.py` | Linear + XGBoost probes against the baselines; expression/HVG-stratified probes. |
-| 06 | `06_significance.py` | Resampled confidence intervals on convergence peaks and model-vs-baseline gaps. |
+| 01 | `01_data.py` | CELLxGENE Census atlas (QC, HVGs, stratified subsample) + TCGA-BRCA bulk, clinical and survival from UCSC Xena; gene harmonisation |
+| 02 | `02_embed.py` | per-cell embeddings: `hvg_pca`, `scgpt`, `geneformer`, one schema |
+| 03 | `03_states.py` | Leiden clusters per representation → marker-gene signatures, swept over resolution × top-k |
+| 04 | `04_translate.py` | signature scores in bulk; age- and stage-adjusted Cox; C-index; family-wise permutation null; matched-random floor; PAM50 reference |
+| 05 | `05_ladder.py` | the ladder, patient-bootstrap intervals, predictions P1–P4 |
+| 06 | `06_report.py` | figures, candidate shortlist, validation-strategy template |
+| — | `run.py` | stages as named tools with a JSON run log (`run.py list`, `run.py all --dry-run`) |
 
----
+Every stage writes `params.json` beside its outputs: arguments, command, git commit, library
+versions, timestamp.
 
-## Data and compute
+## Setup
 
-CPU-only (8 cores, ~165 GB RAM). Starting on scIB **Pancreas** (16.4k cells) and **Immune**
-(33.5k cells); optionally scaling to Tabula Sapiens or CZ CELLxGENE. Heavy outputs (`results/`,
-`cells/`, `*.pt`, `*.h5ad`) are git-ignored and live on a large disk; the virtual environment and
-model caches live on scratch storage.
+```bash
+# uv only. Override the machine-wide venv pointer so this project gets its own environment.
+export UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm
+export HF_HOME=/scratch/.hf-cache          # model weights land here, not on the root disk
+uv sync
+uv run python scripts/run.py list
+uv run python scripts/run.py all --dry-run  # every stage prints its plan; nothing downloads
+```
 
----
+scGPT is installed per its own instructions behind stage 02 (it carries version-sensitive
+dependencies); Geneformer comes from its HuggingFace repository. Both run on CPU with the light
+checkpoints named in `scripts/config.py`.
+
+## Data
+
+| | Source | Used |
+|---|---|---|
+| Single-cell atlas | CELLxGENE Census, `disease == "breast cancer"`, primary data | counts, cell type, donor |
+| Bulk RNA-seq | TCGA-BRCA, UCSC Xena `HiSeqV2` | ~1,100 primary tumours |
+| Clinical + survival | Xena clinical matrix + TCGA-CDR | age, stage, PAM50, OS, PFI |
+
+The two cohorts share no patients. Data and results are git-ignored.
+
+## Statistical conventions
+
+- The **patient** is the unit of independence: all intervals are patient bootstraps.
+- Every score is read **above its null and its floor**; the floor is matched on size and mean
+  expression because prognostic signal correlates with both.
+- "Best of k" is corrected by a **family-wise** permutation null — the null distribution of the
+  *best* signature per representation.
+- Age and stage are **adjusted**, not stratified, in the primary model; subtype-stratified models
+  are a separate prediction (P3).
 
 ## Repository layout
 
 ```
-single-cell-fm-probing/
-  README.md                 # this file
-  docs/DESIGN.md            # full protocol specification and caveats
-  research/literature.md    # the two-pole literature survey and novelty argument
-  scripts/qc_common.py      # shared similarity/geometry toolkit (implemented)
-  pyproject.toml            # dependencies, managed with uv
-  results/                  # git-ignored; heavy outputs live off-repo
-  cells/                    # git-ignored; downloaded h5ad datasets
+docs/DESIGN.md        the design: question, ladder, predictions, stages, conventions
+research/             literature and novelty notes
+scripts/              01–06 stages, run.py orchestrator, config.py, qc_common.py, surv_common.py
+data/  results/       git-ignored
 ```
-
----
 
 ## Licence
 
-MIT © 2026 Natalija Stepurko — see [`LICENSE`](LICENSE).
+MIT.
