@@ -630,7 +630,7 @@ def build():
 <table class="rungs"><tbody>{rungs_html}</tbody></table>
 <h3>The trap the baseline rung guards against</h3>
 {panel(fig_shared_input(), "One input, three views, one scoring set")}
-<p>The three representations are not independent witnesses. They were built from the same expression matrix and their signatures are scored in the same bulk genes. Prognostic signal that appears in all three can come from that shared input — from cell-type composition, from tumour purity, from proliferation — rather than from anything a model learned. The baseline rung is the control: it is what the shared input yields when no model learns anything. Every claim about the foundation models is therefore the margin over that rung.</p>
+<p>The three representations are not independent witnesses. They were built from the same expression matrix and their signatures are scored in the same bulk genes. Prognostic signal that appears in all three can come from that shared input — from cell-type composition, from tumour purity, from proliferation, and none of that reflects what a model learned. The baseline rung is the control: it is what the shared input yields when no model learns anything. Every claim about the foundation models is therefore the margin over that rung.</p>
 
 <h2 id="predictions">Four predictions, written down before running</h2>
 <p class="sub">Each is a yes-or-no test with the failing outcome spelled out. The study can lose.</p>
@@ -660,14 +660,14 @@ def build():
 <table class="rungs"><tbody>
 <tr><td>FM wins</td><td>Test above baseline with an interval excluding zero, both above floor; at least one state prognostic within a PAM50 subtype; its genes drawn from outside the HVG set. The shortlisted states go to validation.</td></tr>
 <tr><td>Sceptics win</td><td>Test ≈ baseline, both below the PAM50 reference. On a clinical endpoint the linear method is sufficient. Reported as the finding, with the margin and its interval.</td></tr>
-<tr><td>Both fail</td><td>Test ≈ baseline ≈ floor. The route from cell state to bulk signature loses the signal; this design cannot separate the two poles, and the report says so rather than looking for a setting where it can.</td></tr>
+<tr><td>Both fail</td><td>Test ≈ baseline ≈ floor. The route from cell state to bulk signature loses the signal; this design cannot separate the two poles, and the report says so and does not look for a setting where it can.</td></tr>
 </tbody></table>
 
 <h2 id="validation">What a positive result would still need</h2>
 <p class="sub">A cell state that passes P1–P3 in TCGA is a hypothesis, not a biomarker. Stage 06 writes a validation plan for each shortlisted state with three fixed steps.</p>
 <div class="steps">
 <div class="step"><h3>Replicate in an independent patient cohort</h3><p>Re-score the signature in METABRIC (~2,000 patients, overall survival) with the same age- and stage-adjusted Cox model. A state that does not replicate is dropped.</p><p class="why">TCGA is one cohort with one sequencing platform and ~15% events. A single-cohort survival result is where most published signatures stop, and where most of them fail.</p></div>
-<div class="step"><h3>Go back to the atlas</h3><p>Check that the signature's genes are expressed in the annotated cell type the state was assigned to, not in a contaminating population, and that the state is present across donors rather than in one.</p><p class="why">A signature can score well in bulk for a reason that has nothing to do with the cells it was named after.</p></div>
+<div class="step"><h3>Go back to the atlas</h3><p>Check that the signature's genes are expressed in the annotated cell type the state was assigned to, not in a contaminating population, and that the state is present in several donors.</p><p class="why">A signature can score well in bulk for a reason that has nothing to do with the cells it was named after.</p></div>
 <div class="step"><h3>Name the tissue assay</h3><p>Specify the multiplexed immunohistochemistry or spatial panel that would show the state's abundance in sections from a cohort with outcome, and the effect size it would need to reach to matter clinically.</p><p class="why">A gene list becomes a finding when it can be seen in tissue and changes a decision. Writing the assay down is the test of whether the state is concrete enough to be one.</p></div>
 </div>
 
