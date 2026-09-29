@@ -40,7 +40,7 @@ distance above Floor. Test against Reference says whether either is clinically i
 **The shared-input confound, carried over from the protein study.** Every representation here
 — scGPT, Geneformer, HVG-PCA — is built from the *same* expression matrix, and the bulk scores
 are computed on the *same* genes. Agreement between them, or prognostic signal in all of them,
-can therefore come from the shared input rather than from anything a model learned. The
+can therefore come from the shared input and not from anything a model learned. The
 Baseline rung is the control for this: it is what the shared input yields with no learned model
 at all. Any FM claim is stated as the margin over that rung, never as an absolute.
 
