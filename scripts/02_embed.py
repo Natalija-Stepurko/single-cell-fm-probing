@@ -107,14 +107,17 @@ def geneformer_tokens(adata, spec):
     norm = np.array([median_dict[e] for e in ens.iloc[loc]])
     toks = np.array([token_dict[e] for e in ens.iloc[loc]])
 
-    X = sp.csr_matrix(adata.layers["counts"])[:, loc].astype(np.float64)
+    # same arithmetic and dtypes as the official tokenizer, chunk by chunk (float32 counts
+    # divided by n_counts and scaled, then float64 division by the gene medians), so that
+    # near-tied genes rank in the same order
+    X = sp.csr_matrix(adata.layers["counts"]).astype(np.float32)
     n_counts = adata.obs["n_counts"].to_numpy()[:, None]
-    Xn = sp.csr_matrix(X.multiply(1.0 / n_counts).multiply(10_000).multiply(1.0 / norm[None, :]))
-    Xn.sort_indices()
     out = []
-    for i in range(Xn.shape[0]):
-        row = Xn[i]
-        out.append(toks[row.indices][np.argsort(-row.data)][: spec["max_len"]])
+    for c0 in range(0, X.shape[0], 512):
+        Xn = sp.csr_matrix(X[c0:c0 + 512][:, loc] / n_counts[c0:c0 + 512] * 10_000 / norm)
+        for i in range(Xn.shape[0]):
+            row = Xn[i]
+            out.append(toks[row.indices][np.argsort(-row.data)][: spec["max_len"]])
     print(f"    tokenised {len(out):,} cells over {len(loc):,} Geneformer genes", flush=True)
     return out
 
