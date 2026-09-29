@@ -20,6 +20,7 @@ HVG-PCA baseline, and the PAM50 subtype call as the reference the field already 
 question is answered by the margin of the foundation models over the baseline — not by any
 number on its own.
 
+Project page: <https://natalija-stepurko.github.io/single-cell-fm-probing/>.
 Full design, predictions and conventions: [`docs/DESIGN.md`](docs/DESIGN.md).
 Literature and novelty: `research/literature.md`.
 
@@ -113,6 +114,7 @@ The two cohorts share no patients. Data and results are git-ignored.
 
 ```
 docs/DESIGN.md        the design: question, ladder, predictions, stages, conventions
+docs/index.html       the project page (GitHub Pages); rebuilt by docs/site/build.py
 research/             literature and novelty notes
 scripts/              01–06 stages, run.py orchestrator, config.py, qc_common.py, surv_common.py
 data/  results/       git-ignored
