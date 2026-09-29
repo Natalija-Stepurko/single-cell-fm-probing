@@ -25,15 +25,15 @@ Literature and novelty: `research/literature.md`.
 
 ## Status
 
-Design complete. Pipeline written (`scripts/01`–`06`, orchestrator `run.py`). **Nothing has run.**
-Both data sources are public and were verified reachable on 2026-09-28.
+Design complete. The pipeline passed an end-to-end smoke test on 2,000 cells on 2026-09-29, and
+the full 50,000-cell run started the same day. Results are not yet in this repository.
 
 ## Pipeline
 
 | Stage | Script | Does |
 |---|---|---|
 | 01 | `01_data.py` | CELLxGENE Census atlas (QC, HVGs, stratified subsample) + TCGA-BRCA bulk, clinical and survival from UCSC Xena; gene harmonisation |
-| 02 | `02_embed.py` | per-cell embeddings: `hvg_pca`, `scgpt`, `geneformer`, one schema |
+| 02 | `02_embed.py` | per-cell embeddings: `hvg_pca`, `scgpt` (via `scgpt_worker.py`), `geneformer`, one schema |
 | 03 | `03_states.py` | Leiden clusters per representation → marker-gene signatures, swept over resolution × top-k |
 | 04 | `04_translate.py` | signature scores in bulk; age- and stage-adjusted Cox; C-index; family-wise permutation null; matched-random floor; PAM50 reference |
 | 05 | `05_ladder.py` | the ladder, patient-bootstrap intervals, predictions P1–P4 |
@@ -45,18 +45,49 @@ versions, timestamp.
 
 ## Setup
 
+Two environments, both built with `uv`. scGPT pins `torchtext` and old `scvi-tools`, so it has its
+own Python 3.11 environment; stage 02 calls it as a subprocess.
+
 ```bash
-# uv only. Override the machine-wide venv pointer so this project gets its own environment.
+# main environment: every stage except the scGPT forward pass
 export UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm
 export HF_HOME=/scratch/.hf-cache          # model weights land here, not on the root disk
 uv sync
-uv run python scripts/run.py list
-uv run python scripts/run.py all --dry-run  # every stage prints its plan; nothing downloads
+
+# scGPT environment
+uv venv --python 3.11 /scratch/.venv-scgpt
+uv pip install --python /scratch/.venv-scgpt/bin/python \
+    --index-url https://download.pytorch.org/whl/cpu torch==2.3.1
+uv pip install --python /scratch/.venv-scgpt/bin/python torchtext==0.18.0 "numpy<2" \
+    "scanpy<1.11" "anndata<0.11" pandas scikit-learn scikit-misc numba "datasets<3" ipython
+uv pip install --python /scratch/.venv-scgpt/bin/python --no-deps scgpt==0.2.4
 ```
 
-scGPT is installed per its own instructions behind stage 02 (it carries version-sensitive
-dependencies); Geneformer comes from its HuggingFace repository. Both run on CPU with the light
-checkpoints named in `scripts/config.py`.
+Checkpoints download on first use from Hugging Face: Geneformer `Geneformer-V1-10M` with its V1
+dictionaries (`ctheodoris/Geneformer`), and the scGPT whole-human checkpoint as released by the
+authors' lab (`wanglab/scGPT-human`). Set `SCGPT_PYTHON` if the scGPT environment lives elsewhere.
+
+```bash
+uv run python scripts/run.py list
+SCFM_SMOKE=1 uv run python scripts/run.py all   # 2,000 cells, short control loops, writes smoke/; ~8 min
+uv run python scripts/run.py all                # the study
+```
+
+### Runtime
+
+Measured on 4 physical CPU cores (Xeon Platinum 8573C, no GPU):
+
+| Stage | Throughput or time |
+|---|---|
+| 01 atlas and bulk download | ~1 min for the smoke set |
+| 02 Geneformer, bfloat16 | ~66 cells/s |
+| 02 scGPT, bfloat16 | ~10 cells/s |
+| 03–05 on the smoke set | ~75 s |
+
+Embedding runs in bfloat16 on CPUs with AMX. Against fp32 on 300 cells, per-cell cosine similarity
+was at least 0.9999 for both models and 98% of 15-nearest neighbours were unchanged.
+`02_embed.py --precision fp32 --limit 300` repeats the check. Cells are sorted by length and packed
+into batches, and results are written in shards, so an interrupted stage 02 resumes.
 
 ## Data
 

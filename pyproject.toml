@@ -21,6 +21,8 @@ dependencies = [
     "cellxgene-census>=1.15",
     # survival
     "lifelines>=0.29",
+    "scikit-misc>=0.3",
+    "joblib>=1.4",
     # foundation models (light CPU checkpoints)
     "torch>=2.2",
     "transformers>=4.44",

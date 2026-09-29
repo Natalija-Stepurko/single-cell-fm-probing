@@ -68,7 +68,7 @@ def main():
     ladder = []
     for m, r in best.iterrows():
         ladder.append({"model": m, "kind": r["kind"], "signature": r["signature"],
-                       "top_cell_type": r["top_cell_type"], "cindex": r["cindex"],
+                       "resolution": r["resolution"], "top_cell_type": r["top_cell_type"], "cindex": r["cindex"],
                        "ci_lo": lo(boot[m]), "ci_hi": hi(boot[m]),
                        "floor_mean": r["floor_mean"], "above_floor": r["above_floor"],
                        "null_p95": meta["nulls"][m]["best_cindex_null_p95"],

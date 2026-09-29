@@ -39,8 +39,8 @@ def fig_ladder(ladder, ref, out):
         ax.plot([r["floor_mean"]] * 2, [i - .3, i + .3], color="#888", lw=1, ls=":")
     ax.axvline(0.5, color="#B9C0C6", lw=1)
     if np.isfinite(ref):
-        ax.axvline(ref, color="#16191D", lw=1, ls="--"); ax.text(ref, len(y) - .4, "PAM50",
-                                                                 fontsize=8, ha="center")
+        ax.axvline(ref, color="#16191D", lw=1, ls="--"); ax.text(ref, len(y) - .75, "PAM50 ", fontsize=8,
+                                                                 ha="right", va="center")
     ax.set_yticks(y); ax.set_yticklabels(ladder.index); ax.set_xlabel("concordance index")
     ax.set_title("Best signature per representation — patient bootstrap 95%; dotted = matched-random floor",
                  fontsize=9, loc="left")
@@ -132,7 +132,7 @@ def main():
     if fm:
         top = max(fm, key=lambda m: ladder.loc[m, "above_floor"])
         r = ladder.loc[top]
-        fig_km(clin, zexpr, sigs[top][str(scores.set_index("signature").loc[r["signature"], "resolution"])]
+        fig_km(clin, zexpr, sigs[top][str(r["resolution"])]
                [r["signature"]]["genes"], ev, tm, top, out)
 
     # shortlist: FM signatures above floor AND above the family-wise null

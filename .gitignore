@@ -12,6 +12,7 @@ wheels/
 
 # Saved embedding tensors, downloaded data, and results
 results/
+smoke/
 data/
 cells/
 
