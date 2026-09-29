@@ -2,9 +2,8 @@
 
 For every embedding: build a neighbour graph, cluster with Leiden at each resolution in the
 sweep, and rank marker genes per cluster (Wilcoxon on log-normalised expression). Each cluster
-at each (resolution, top-k) becomes one candidate signature. The sweep is deliberate: signature
-derivation is the step most likely to dominate the answer, so the ladder is reported at every
-setting rather than at one chosen after the fact.
+at each (resolution, top-k) becomes one candidate signature. Signature derivation is the step
+most likely to dominate the answer, so the ladder is reported at every setting in the sweep.
 
 Also records, per signature, the fraction of its genes that are HVGs — the quantity P4 needs.
 """
@@ -20,7 +19,7 @@ import config as C
 import qc_common as qc
 
 
-def signatures_for(adata, X: np.ndarray, resolutions, topks, min_cells, seed):
+def signatures_for(adata, X: np.ndarray, resolutions, topks, min_cells, seed, universe=None):
     import scanpy as sc
     a = adata.copy()
     a.obsm["X_rep"] = X
@@ -35,7 +34,10 @@ def signatures_for(adata, X: np.ndarray, resolutions, topks, min_cells, seed):
         keep = sizes[sizes >= min_cells].index.tolist()
         if len(keep) < 2:
             continue
-        sub = a[a.obs[key].isin(keep)].copy()
+        sub = a[a.obs[key].isin(keep)]
+        # markers are drawn only from genes the bulk cohort measures, so a top-k signature
+        # is scored in bulk with all k of its genes
+        sub = (sub[:, sub.var_names.isin(universe)] if universe is not None else sub).copy()
         sc.tl.rank_genes_groups(sub, key, method="wilcoxon", n_genes=max(topks))
         out[str(res)] = {}
         for cl in keep:
@@ -73,6 +75,9 @@ def main():
 
     import anndata as ad
     adata = ad.read_h5ad(Path(args.data_dir) / "atlas.h5ad")
+    gm = Path(args.data_dir) / "gene_map.json"
+    universe = set(json.load(open(gm))["genes"]) if gm.exists() else None
+    print(f"  marker universe: {len(universe) if universe else adata.n_vars:,} genes", flush=True)
     sigs, summary = {}, {}
     for m in args.models:
         p = Path(args.emb_dir) / f"{m}.npz"
@@ -82,7 +87,7 @@ def main():
         assert list(z["obs_names"]) == list(adata.obs_names), f"{m}: cell order mismatch"
         print(f"  {m}: clustering …", flush=True)
         sigs[m] = signatures_for(adata, z["X"], args.resolutions, args.topk, args.min_cells,
-                                 args.seed)
+                                 args.seed, universe)
         n = sum(len(v) for v in sigs[m].values())
         summary[m] = {"n_signatures": n,
                       "n_states": {r: len({s["cluster"] for s in v.values()})

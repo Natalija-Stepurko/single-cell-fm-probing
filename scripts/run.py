@@ -6,9 +6,8 @@ stopping at the first failure. Every call appends to results/run_log.json: the c
 and end time, exit code, and the params.json the stage wrote — so a run is reconstructible from
 the log alone.
 
-Nothing here is clever. The point is that every analysis step has a name, an argument list, a
-provenance record and an exit code, which is what makes it drivable by an agent rather than by
-a notebook.
+Every analysis step has a name, an argument list, a provenance record and an exit code, so an
+agent or a person can drive the pipeline step by step.
 """
 import argparse
 import json

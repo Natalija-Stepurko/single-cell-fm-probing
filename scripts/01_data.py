@@ -35,41 +35,58 @@ def fetch(url: str, dest: Path) -> Path:
 
 # ───────────────────────────────────────────────────────────────── single-cell arm
 def build_atlas(out: Path, max_cells: int, seed: int):
+    """Metadata first, then only the chosen cells' counts: the full query is ~1M cells."""
     import cellxgene_census
     import scanpy as sc
 
-    print("  querying Census …", flush=True)
+    rng = np.random.default_rng(seed)
+    print("  querying Census metadata …", flush=True)
     with cellxgene_census.open_soma(census_version=C.CENSUS_VERSION) as census:
+        exp = census["census_data"]["homo_sapiens"]
+        obs = exp.obs.read(value_filter=C.CENSUS_OBS_FILTER,
+                           column_names=C.CENSUS_OBS_COLUMNS).concat().to_pandas()
+        obs = obs[obs["assay"].astype(str).str.startswith(C.ASSAY_PREFIX)
+                  & (obs["nnz"] >= C.MIN_GENES_PER_CELL)]
+        print(f"  {len(obs):,} candidate cells, {obs['donor_id'].nunique()} donors, "
+              f"{obs['dataset_id'].nunique()} datasets", flush=True)
+        # oversample by 25% so the mitochondrial filter below can still reach max_cells
+        take = min(len(obs), int(max_cells * 1.25))
+        pick = (obs.groupby("cell_type", observed=True, group_keys=False)
+                .apply(lambda g: g.sample(frac=take / len(obs),
+                                          random_state=int(rng.integers(1 << 31)))))
+        coords = np.sort(pick["soma_joinid"].to_numpy())
+        print(f"  downloading counts for {len(coords):,} cells …", flush=True)
         adata = cellxgene_census.get_anndata(
-            census, organism=C.CENSUS_ORGANISM,
-            obs_value_filter=C.CENSUS_OBS_FILTER,
-            column_names={"obs": C.CENSUS_OBS_COLUMNS, "var": ["feature_id", "feature_name"]})
-    print(f"  {adata.n_obs:,} cells × {adata.n_vars:,} genes before QC", flush=True)
+            census, organism=C.CENSUS_ORGANISM, obs_coords=coords,
+            obs_column_names=[c for c in C.CENSUS_OBS_COLUMNS if c != "soma_joinid"],
+            var_column_names=["feature_id", "feature_name"])
+    adata.obs_names = adata.obs_names.astype(str)
+    adata.var["ensembl_id"] = adata.var["feature_id"].astype(str).values
     adata.var_names = adata.var["feature_name"].astype(str).values
     adata.var_names_make_unique()
 
-    # QC: drop low-complexity and high-mitochondrial cells
     adata.var["mt"] = adata.var_names.str.startswith("MT-")
     sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], inplace=True)
     keep = (adata.obs["n_genes_by_counts"] >= C.MIN_GENES_PER_CELL) & \
            (adata.obs["pct_counts_mt"] <= 100 * C.MAX_MT_FRACTION)
     adata = adata[keep].copy()
-
-    # subsample stratified by cell type so rare states survive the CPU budget
-    rng = np.random.default_rng(seed)
     if adata.n_obs > max_cells:
         frac = max_cells / adata.n_obs
         idx = (adata.obs.groupby("cell_type", observed=True, group_keys=False)
                .apply(lambda g: g.sample(frac=frac, random_state=int(rng.integers(1 << 31))))
                .index)
         adata = adata[idx].copy()
+    # drop genes no retained cell expresses; keeps every downstream matrix smaller
+    sc.pp.filter_genes(adata, min_cells=1)
 
+    adata.obs["n_counts"] = np.asarray(adata.X.sum(axis=1)).ravel()   # Geneformer needs it
     adata.layers["counts"] = adata.X.copy()
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
     sc.pp.highly_variable_genes(adata, n_top_genes=C.N_HVG, flavor="seurat_v3", layer="counts")
     print(f"  {adata.n_obs:,} cells × {adata.n_vars:,} genes after QC; "
-          f"{int(adata.var['highly_variable'].sum())} HVGs", flush=True)
+          f"{int(adata.var['highly_variable'].sum())} HVGs; "
+          f"{adata.obs['donor_id'].nunique()} donors", flush=True)
     adata.write_h5ad(out / "atlas.h5ad")
     return adata
 
