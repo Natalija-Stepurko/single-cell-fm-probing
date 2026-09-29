@@ -1,132 +1,129 @@
-# Project plan — do single-cell foundation models learn biology beyond highly-expressed genes?
+# Design — do foundation-model cell states stratify cancer patients better than a linear baseline?
 
-*Focused design for this repository. The full literature review and novelty analysis are the
-private working note `../research/literature.md`; the positioning is summarised in §1. This
-pipeline applies a layer-resolved geometry-and-probe protocol to a contested substrate.*
+*The literature and novelty analysis live in `../research/literature.md`. This document is the
+experimental design: what is measured, against what, and in what order. Nothing here has run.*
 
-## 1. The claim under test
+## 1. The question
 
-Three single-cell foundation models trained on **self-supervised gene-expression** signals,
-with **different objectives and architectures**:
+Single-cell foundation models (scGPT, Geneformer) are trained to reconstruct masked gene
+expression across tens of millions of cells. Whether the cell states they learn carry biology
+beyond what a linear method on ~2,000 highly-variable genes (HVGs) already captures is disputed:
+one pole reports strong zero-shot generalisation, the other that HVG + PCA matches or beats them
+(`literature.md` §1–2).
 
-- **scGPT** (value-aware masked modelling; transformer, 12 layers, d=512) — never given cell
-  labels.
-- **Geneformer** (rank-value masked modelling; BERT-style, 6/12 layers) — no expression
-  magnitudes, only rank.
-- **UCE** (optional third arm; genes tokenized by **ESM-2 protein embeddings**, 4-layer on
-  CPU) — the cross-modality optimist pole.
+That dispute has been argued on embedding geometry and cell-type clustering. This study asks it
+on a **clinical endpoint**: take the cell states each representation finds in a tumour
+single-cell atlas, translate them into gene signatures, score those signatures in bulk tumour
+RNA-seq from an independent patient cohort, and ask whether they **stratify patient survival** —
+and whether the foundation-model signatures add prognostic value over the linear baseline's.
 
-**The open question (disputed, not settled — this is the point).** Do these models encode
-biology *beyond what a linear model on the ~2,000 highly-variable genes (HVGs) already
-captures*, and *where in the network* does any such signal live? One pole (**UCE**, Rosen et
-al., *Nature* 2026) reports strong zero-shot generalisation; the other (**Kedzierska** *Genome
-Biology* 2025; **Boiarsky**; **Souza & Mehta** arXiv:2602.16696) reports that **HVG+PCA
-matches or beats** the models. The novelty is the *unified, layer-resolved,
-geometry-vs-decodability protocol* that adjudicates *where* and *for which properties* the
-foundation models do or do not beat the linear baseline — not the phenomenon itself.
+**Indication: breast cancer.** Largest TCGA cohort with RNA-seq and survival (~1,100 patients);
+a well-annotated public single-cell atlas; and a canonical published reference (PAM50 intrinsic
+subtypes) that gives the ladder a fixed rung the field already accepts.
 
-**Falsifiable predictions**
-- **P1 — Depth × linearity law indexed by locality.** Per-gene (local) targets peak early and
-  decode *linearly*; per-cell (global) targets peak late and *non-linearly* (XGB−linear gap);
-  best layer tracks locality.
-- **P2 — Geometry-vs-decodability divergence.** There exist regimes where unsupervised
-  k-NN/LVR/UMAP organisation and supervised probe accuracy disagree — e.g. cell-type is
-  decodable by a probe yet the UMAP "does not cluster."
-- **P3 — Convergence toward the linear baseline.** FM layers converge (CKA/SVCCA) toward
-  HVG-PCA above permutation baseline. High convergence favours the skeptics; a shared FM map
-  that HVG-PCA does *not* sit inside favours the optimists. With UCE, also test whether the
-  protein-embedding-tokenized model converges with the expression-tokenized ones.
+## 2. Why this is not just another probe
 
-## 2. Model set (CPU-feasible)
+Every number in this study is read against a ladder, because a hazard ratio or a concordance
+index means nothing on its own:
 
-| Arm | Model | Signal | Architecture | Layer axis |
-|---|---|---|---|---|
-| A | **scGPT** (whole-human) | value-masked | Transformer (~50M) | embed → 12 blocks |
-| B | **Geneformer** (V1 6/12-layer; V2-316M only if GPU) | rank-masked | BERT (~10–38M) | embed → 6/12 blocks |
-| C (opt.) | **UCE** (4-layer; 33-layer GPU-only) | ESM-2 gene-embedding → cell | Transformer | embed → 4 blocks |
-| Baseline | **HVG-PCA / scVI / logistic-on-HVG** | — | linear / VAE | single "layer" |
-
-**Why on CPU.** All three FMs run batch-1 on CPU with the light checkpoints. UCE is added only
-after the core scGPT/Geneformer pair works, because it needs precomputed ESM-2 gene-embedding
-tables and is the heaviest to stand up. The baseline arm is treated as a pseudo-model with one
-"layer" so stage 04 can measure FM→baseline convergence with the same CKA/SVCCA machinery.
-
-## 3. Dataset
-
-- **Primary:** scIB **Immune** (33,506 human immune cells, 10 batches) and **Pancreas**
-  (16,382 cells, 9 batches) — Luecken 2021, *Nature Methods*; h5ad on Figshare/`theislab/scib`.
-  Ship `cell_type` (global target) and `batch` (nuisance target).
-- **Scale-up (optional):** a **Tabula Sapiens** organ subset (multi-tissue) and a
-  **CZ CELLxGENE Census** slice — the exact benchmark Souza & Mehta used — for direct
-  comparability with the published skeptic result.
-- **Redundancy control:** **donor/dataset-grouped** train/test splits so probe accuracy is not
-  memorised composition or donor identity.
-
-## 4. Labels (split by locality: per-gene vs per-cell)
-
-| Locality | Property | Source |
+| Rung | What it is | What it establishes |
 |---|---|---|
-| **Per-gene (expect early / linear)** | HVG status, mean-expression bin, gene-program / GO membership, TF vs non-TF, marker-gene status | computed from data + GO/Reactome/TF lists |
-| **Per-cell (expect late / non-linear)** | Cell type, tissue, disease/condition, cell-cycle phase | dataset annotations |
-| **Nuisance (want LOW organisation)** | Batch / donor / technology | dataset metadata |
+| **Null** | survival outcomes permuted across patients | what any signature scores by chance |
+| **Floor** | 200 random gene sets matched to each signature for size and mean expression | what *any* gene set of that shape scores — the honest zero |
+| **Baseline** | cell-state signatures derived from **HVG-PCA** clusters | what the linear method the sceptics defend achieves |
+| **Test** | cell-state signatures derived from **scGPT** and **Geneformer** clusters | the claim under test |
+| **Reference** | PAM50 subtype call and a published prognostic signature | where the field already is |
 
-The "beyond highly-expressed genes" dispute is operationalised as **expression/HVG-stratified**
-probing and **HVG-ablation** of the input.
+The comparison that decides the question is **Test against Baseline**, both read as their
+distance above Floor. Test against Reference says whether either is clinically interesting.
 
-## 5. Pipeline stages
+**The shared-input confound, carried over from the protein study.** Every representation here
+— scGPT, Geneformer, HVG-PCA — is built from the *same* expression matrix, and the bulk scores
+are computed on the *same* genes. Agreement between them, or prognostic signal in all of them,
+can therefore come from the shared input rather than from anything a model learned. The
+Baseline rung is the control for this: it is what the shared input yields with no learned model
+at all. Any FM claim is stated as the margin over that rung, never as an absolute.
+
+## 3. Falsifiable predictions
+
+- **P1.** FM-derived signatures reach a concordance index above the Floor. *If not, the FM cell
+  states carry no prognostic biology at all.*
+- **P2.** FM-derived signatures exceed HVG-PCA-derived signatures by a margin whose bootstrap
+  interval excludes zero. *If not, "one PCA rules them all" holds on this endpoint.*
+- **P3.** At least one FM-derived state is prognostic **within** a PAM50 subtype. *If so, it is
+  biology the reference does not already encode; if not, the FM has rediscovered PAM50.*
+- **P4.** FM signatures that pass P2 are enriched for genes *outside* the HVG set. *If so, the
+  "beyond highly-expressed genes" claim has a concrete instance.*
+
+## 4. Data
+
+| Arm | Source | What is used |
+|---|---|---|
+| Single-cell tumour atlas | CELLxGENE Census, `disease == "breast cancer"`, primary data only | raw counts, `cell_type`, `donor_id`, `dataset_id` |
+| Bulk tumour RNA-seq | TCGA-BRCA via UCSC Xena, `HiSeqV2` (log2 RSEM+1) | ~1,100 tumour samples |
+| Clinical | Xena `BRCA_clinicalMatrix` + TCGA-CDR survival table | age, stage, PAM50, OS / OS.time, PFI / PFI.time |
+
+Gene vocabulary is harmonised to HGNC symbols across all three. Single-cell and bulk cohorts
+are **disjoint patients** by construction, so every bulk result is an out-of-cohort test.
+
+## 5. Pipeline
 
 | Stage | Script | Output |
 |---|---|---|
-| 01 | `01_fetch_cells.py` | scIB h5ad → QC, gene-vocab harmonisation, `cells.jsonl` manifest + per-cell `.npz` + gene-metadata table. |
-| 02a | `02_extract_embeddings_scgpt.py` | scGPT all-layer per-gene + cell `.pt` (fp16). |
-| 02b | `02_extract_embeddings_geneformer.py` | Geneformer all-layer per-gene + cell `.pt`. |
-| 02c | `02c_baselines.py` | HVG-PCA / scVI / logistic-on-HVG embeddings in the same schema. |
-| 02d | `02_extract_embeddings_uce.py` (opt.) | UCE 4-layer embeddings. |
-| 03 | `03_analyze_embeddings.py` | Per-layer k-NN purity (cell type / batch), per-gene LVR, UMAP, depth law. |
-| 04 | `04_convergence.py` | CKA/SVCCA/mutual-kNN, layer×layer: scGPT↔Geneformer(↔UCE) **and each FM↔HVG-PCA**, with permutation baselines. |
-| 05 | `05_property_prediction.py` | Linear + XGBoost probes per layer × pooling × property vs the HVG baseline; learning curves; beyond-HVG stratified + ablation probes. |
-| 06 | `06_significance.py` | Resampled 95% CIs on stage-04 peaks and FM-vs-baseline probe gaps. |
+| 01 | `01_data.py` | atlas `.h5ad` (QC'd, HVGs flagged), bulk expression matrix, clinical table, gene map |
+| 02 | `02_embed.py` | per-cell embeddings for `scgpt`, `geneformer`, `hvg_pca`, one schema |
+| 03 | `03_states.py` | Leiden clusters per representation → marker-gene signatures (`signatures.json`) |
+| 04 | `04_translate.py` | signature scores in bulk; Cox models (age + stage adjusted); C-index; permutation null; matched-random floor |
+| 05 | `05_ladder.py` | the ladder assembled, bootstrap intervals over patients, P1–P4 tested |
+| 06 | `06_report.py` | figures, candidate shortlist, validation-strategy template |
+| — | `run.py` | orchestrator: runs stages as tools, writes a JSON run log |
 
-`scripts/qc_common.py` provides CKA/SVCCA/mutual-kNN/k-NN-purity/LVR; all operate on plain
-`[n, d]` arrays, so they apply unchanged to gene-token and cell embeddings. Cross-model
-alignment in stage 04 is by **cell barcode** (strictly simpler than the protein port's residue
-alignment). Stage 04's FM↔HVG-PCA grid is the genuinely new scientific piece and the direct
-test of "one PCA still rules them all."
+Every stage writes `params.json` beside its outputs (arguments, command, git commit, library
+versions, timestamp) via `qc_common.record_params`.
 
-## 6. Analyses (the paper spine)
+## 6. Statistical conventions
 
-1. **Do FM cell embeddings beat HVG-PCA/scVI/logistic-on-HVG?** — best-layer probe table +
-   learning curves.
-2. **Local→global depth × linearity law** (P1).
-3. **Geometry-vs-decodability divergence** (P2) — the sharpest result on this substrate.
-4. **Convergence-toward-a-linear-baseline** (P3) — the measurable form of "one PCA rules them
-   all"; with UCE, the cross-modality convergence twist.
-5. **Beyond-highly-expressed-genes** — expression/HVG-stratified probes + HVG ablation.
-6. **Embedding health** — anisotropy / effective rank / collapse as intrinsic reliability
-   signals (single-cell embeddings are known anisotropic; diagnostics are load-bearing).
+Carried over from the protein study, where each was learned the hard way:
 
-## 7. First milestone (skeleton)
+- **The patient is the unit of independence.** Intervals are bootstraps over patients, never over
+  genes or cells. Cell-level clustering is done once; its stability is a separate diagnostic.
+- **Every score is read above its null and its floor.** The floor is matched on size and mean
+  expression because prognostic signal correlates with both.
+- **Multiple testing by family-wise permutation.** For each representation the null is the
+  distribution of the *best* signature's C-index under permuted outcomes, so "best of k" is
+  controlled at the ladder level, not per signature.
+- **Adjustment, not stratification, for age and stage** in the primary model; subtype-stratified
+  models are P3 and reported separately.
+- **Nothing is compared across cohorts of different size** without saying so; C-index is
+  budget-sensitive.
 
-1. `01` on a 5k-cell scIB Pancreas subset (`--limit`); confirm manifest + gene-vocab
-   harmonisation + gene-metadata join for both models.
-2. `02a`/`02b` on the subset; confirm all-layer per-gene + cell `.pt` extraction and
-   resume-skip.
-3. `02c` baselines; `03` on both models + baseline — validate the depth split on **cell type
-   (global) vs HVG-status (local)**.
-4. `04` first scGPT↔Geneformer CKA peak **and** the FM↔HVG-PCA convergence number
-   (permutation baseline ≈ 0).
-5. `05` probes vs baselines + beyond-HVG; scale to full Immune + Pancreas; add UCE; `06`
-   significance.
+## 7. What a positive and a negative result each look like
 
-## 8. Risks & caveats
+- **FM wins.** Test > Baseline above Floor, interval excludes zero, at least one state prognostic
+  within a PAM50 subtype, signature enriched outside HVGs. Shortlist those states' marker genes.
+- **Sceptics win.** Test ≈ Baseline, both ≪ Reference. Report it as the finding: on a clinical
+  endpoint, the linear method is sufficient. This is a publishable negative.
+- **Both fail.** Test ≈ Baseline ≈ Floor. The cell-state → bulk translation loses the signal;
+  the study cannot separate the poles on this design.
 
-- **Not a new phenomenon, not an empty field** — the 2026 interpretability wave exists; frame
-  the contribution as the unified matched-protocol adjudication *between* named poles.
-- **CPU throughput / tokenization** — batch-1 CPU inference; start small; UCE is heaviest
-  (needs ESM-2 gene embeddings), add last; V2-316M and UCE-33L are GPU-only.
-- **Gene-vocabulary mismatch** — scGPT vs Geneformer vs UCE tokenize differently; per-model
-  vocab harmonisation is the main new engineering; cells stay barcode-aligned for stage 04.
-- **Attention-as-edges is weak here** — single-cell attention encodes co-expression, not
-  regulation (arXiv:2602.17532); keep the edge arm diagnostic.
-- **Batch effects are a feature** — report cell-type purity and batch purity side by side.
-- **Label/coverage skew** — report per-property coverage explicitly, not a single headline number.
+## 8. Validation strategy (what stage 06 templates)
+
+For each shortlisted state: (1) replicate the Cox result in METABRIC, an independent bulk
+cohort with survival; (2) check the marker genes against the state's cell-type annotation in the
+atlas; (3) name the orthogonal assay that would confirm the state in tissue.
+
+## 9. Compute
+
+CPU-only. Light checkpoints (scGPT whole-human, Geneformer 6-layer) at batch 1; the atlas is
+subsampled to ≤50,000 cells stratified by cell type for embedding. Bulk arm is trivially cheap.
+Own venv: `UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm` (see `CLAUDE.md`).
+
+## 10. Risks
+
+- **Signature-derivation choices dominate.** Cluster resolution and marker-gene count set the
+  signatures; both are swept, and the ladder is reported at each setting.
+- **Bulk deconvolution is approximate.** A signature score in bulk is a proxy for state abundance;
+  stated as such throughout.
+- **TCGA-BRCA survival is right-censored with ~15% events.** PFI is the secondary endpoint for
+  power; both reported.
+- **Atlas composition ≠ TCGA composition.** Subtype mix differs; P3 addresses this directly.
