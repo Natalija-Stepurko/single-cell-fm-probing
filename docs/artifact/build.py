@@ -30,12 +30,14 @@ SANS = "ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,
 
 
 # ----------------------------------------------------------------------------- svg helpers
-def T(x, y, s, size=12, fill=INK, anchor="start", weight=400, mono=False, dy=0, italic=False):
+def T(x, y, s, size=12, fill=INK, anchor="start", weight=400, mono=False, dy=0, italic=False, halo=False):
     fam = MONO if mono else SANS
     s = s.replace("& ", "&amp; ")
     st = f"font-family:{fam};font-size:{size}px;fill:{fill};font-weight:{weight}"
     if italic:
         st += ";font-style:italic"
+    if halo:
+        st += f";paint-order:stroke;stroke:{PANEL};stroke-width:5px;stroke-linejoin:round"
     return (f'<text x="{x}" y="{y + dy}" text-anchor="{anchor}" dominant-baseline="middle" '
             f'style="{st}">{s}</text>')
 
@@ -74,273 +76,239 @@ def cells_glyph(x, y, n=18, seed=3, r=2.2, fill=MUTED):
 
 # ----------------------------------------------------------------------------- figures
 def fig_dispute():
-    W, H = 980, 210
+    W, H = 980, 196
     b = []
-    # two poles
-    b.append(box(20, 24, 430, 118, fill="#F2F4F5"))
-    b.append(T(38, 46, "SCEPTICS", 10.5, MUTED, mono=True, weight=600))
-    b.append(T(38, 72, "A linear summary of ~2,000 variable genes", 14))
-    b.append(T(38, 92, "matches or beats the foundation models", 14))
-    b.append(T(38, 118, "Kedzierska 2025 · Boiarsky 2023 · Souza & Mehta 2026", 11, MUTED, mono=True))
-    b.append(box(530, 24, 430, 118, fill="#F2F4F5"))
-    b.append(T(548, 46, "OPTIMISTS", 10.5, MUTED, mono=True, weight=600))
-    b.append(T(548, 72, "The models learn cell biology that", 14))
-    b.append(T(548, 92, "transfers zero-shot to unseen data", 14))
-    b.append(T(548, 118, "Cui 2024 · Theodoris 2023 · Rosen 2026", 11, MUTED, mono=True))
-    # the arena so far vs here
-    b.append(T(490, 60, "argued on", 11, MUTED, anchor="middle", italic=True))
-    b.append(T(490, 80, "cluster maps", 12.5, INK, anchor="middle", weight=600))
-    b.append(T(490, 98, "cell-type labels", 12.5, INK, anchor="middle", weight=600))
-    b.append(arrow(490, 150, 490, 172))
-    b.append(T(490, 190, "This study asks the same question on a clinical endpoint: patient survival.", 13.5, INK, anchor="middle", weight=600))
+    b.append(box(20, 10, 390, 122, fill="#F2F4F5"))
+    b.append(T(40, 32, "SCEPTICS", 10.5, MUTED, mono=True, weight=600))
+    b.append(T(40, 58, "A linear summary of ~2,000 variable genes", 14))
+    b.append(T(40, 78, "matches or beats the foundation models", 14))
+    b.append(T(40, 108, "Kedzierska 2025 · Boiarsky 2023 · Souza &amp; Mehta 2026", 10, MUTED, mono=True))
+    b.append(box(570, 10, 390, 122, fill="#F2F4F5"))
+    b.append(T(590, 32, "OPTIMISTS", 10.5, MUTED, mono=True, weight=600))
+    b.append(T(590, 58, "The models learn cell biology that", 14))
+    b.append(T(590, 78, "transfers zero-shot to unseen data", 14))
+    b.append(T(590, 108, "Cui 2024 · Theodoris 2023 · Rosen 2026", 10, MUTED, mono=True))
+    b.append(T(490, 52, "so far argued on", 11, MUTED, anchor="middle", italic=True))
+    b.append(T(490, 74, "cluster maps and", 12, INK, anchor="middle", weight=600))
+    b.append(T(490, 92, "cell-type labels", 12, INK, anchor="middle", weight=600))
+    b.append(arrow(490, 140, 490, 158))
+    b.append(T(490, 176, "This study asks the same question on a clinical endpoint: patient survival.", 13.5, INK, anchor="middle", weight=600))
     return svg(W, H, "".join(b), "The two poles of the dispute and where this study moves it")
 
 
-def fig_flow():
-    """The whole design, left to right: atlas -> three representations -> states -> signatures -> bulk -> survival -> ladder."""
-    W, H = 980, 400
+def fig_cohorts():
+    W, H = 980, 186
     b = []
-    # column x positions
-    xs = {"atlas": 20, "rep": 190, "states": 380, "sig": 560, "bulk": 720, "out": 880}
-    # atlas
-    b.append(box(xs["atlas"], 120, 120, 150))
-    b.append(cells_glyph(xs["atlas"] + 30, 140, n=34, seed=5, fill=MUTED))
-    b.append(cells_glyph(xs["atlas"] + 30, 175, n=22, seed=9, fill="#8A9298"))
-    b.append(T(xs["atlas"] + 60, 232, "breast tumour", 12, INK, anchor="middle", weight=600))
-    b.append(T(xs["atlas"] + 60, 248, "single-cell atlas", 12, INK, anchor="middle", weight=600))
-    b.append(T(xs["atlas"] + 60, 100, "1  ONE INPUT", 10.5, MUTED, anchor="middle", mono=True, weight=600))
-    b.append(T(xs["atlas"] + 60, 290, "CELLxGENE Census", 10.5, MUTED, anchor="middle", mono=True))
-    b.append(T(xs["atlas"] + 60, 304, "≤50,000 cells", 10.5, MUTED, anchor="middle", mono=True))
-    # three representations
-    b.append(T(xs["rep"] + 70, 100, "2  THREE WAYS TO SEE IT", 10.5, MUTED, anchor="middle", mono=True, weight=600))
-    ys = {"hvg_pca": 120, "scgpt": 190, "geneformer": 260}
-    for m, y in ys.items():
-        b.append(box(xs["rep"], y, 140, 52, stroke=COL[m], sw=1.5))
-        b.append(f'<rect x="{xs["rep"]}" y="{y}" width="5" height="52" rx="2" fill="{COL[m]}"/>')
-        b.append(T(xs["rep"] + 16, y + 18, NAME[m].replace(" (baseline)", ""), 12.5, INK, weight=600))
-        sub = {"hvg_pca": "linear · no learning", "scgpt": "foundation model", "geneformer": "foundation model"}[m]
-        b.append(T(xs["rep"] + 16, y + 36, sub, 10.5, MUTED, mono=True))
-        b.append(arrow(xs["atlas"] + 120, 195, xs["rep"] - 4, y + 26))
-    # states
-    b.append(T(xs["states"] + 70, 100, "3  CELL STATES", 10.5, MUTED, anchor="middle", mono=True, weight=600))
-    for m, y in ys.items():
-        b.append(box(xs["states"], y, 140, 52))
-        # clusters glyph
-        import random
-        rnd = random.Random({"hvg_pca": 1, "scgpt": 2, "geneformer": 3}[m])
-        for k in range(3):
-            cx, cy = xs["states"] + 22 + k * 24, y + 26
-            for _ in range(7):
-                b.append(f'<circle cx="{cx + rnd.uniform(-7, 7):.1f}" cy="{cy + rnd.uniform(-9, 9):.1f}" r="2" fill="{COL[m]}" opacity=".75"/>')
-        b.append(T(xs["states"] + 96, y + 20, "groups of", 10.5, MUTED))
-        b.append(T(xs["states"] + 96, y + 34, "similar cells", 10.5, MUTED))
-        b.append(arrow(xs["rep"] + 140, y + 26, xs["states"] - 4, y + 26))
-    # signatures
-    b.append(T(xs["sig"] + 55, 100, "4  MARKER GENES", 10.5, MUTED, anchor="middle", mono=True, weight=600))
-    for m, y in ys.items():
-        b.append(box(xs["sig"], y, 110, 52))
-        for i in range(4):
-            wl = [70, 52, 62, 40][i]
-            b.append(f'<rect x="{xs["sig"] + 14}" y="{y + 10 + i * 9}" width="{wl}" height="4" rx="2" fill="{COL[m]}" opacity="{.9 - i * .18}"/>')
-        b.append(arrow(xs["states"] + 140, y + 26, xs["sig"] - 4, y + 26))
-    # bulk cohort
-    b.append(T(xs["bulk"] + 60, 100, "5  A SECOND COHORT", 10.5, MUTED, anchor="middle", mono=True, weight=600))
-    b.append(box(xs["bulk"], 120, 120, 150))
-    # patients glyph: grid of small squares
+    b.append(box(20, 10, 440, 112))
+    b.append(cells_glyph(30, 26, n=40, seed=2, fill=MUTED))
+    b.append(cells_glyph(58, 44, n=28, seed=7, fill="#8A9298"))
+    b.append(T(170, 34, "single-cell atlas", 13, INK, weight=600))
+    b.append(T(170, 58, "tens of thousands of cells", 12, MUTED))
+    b.append(T(170, 76, "from a few dozen tumours,", 12, MUTED))
+    b.append(T(170, 94, "used to find cell states", 12, MUTED))
+    b.append(T(240, 138, "CELLxGENE Census · breast cancer · primary data", 10, MUTED, anchor="middle", mono=True))
+    b.append(box(520, 10, 440, 112))
     for i in range(6):
         for j in range(5):
-            b.append(f'<rect x="{xs["bulk"] + 18 + i * 15}" y="{138 + j * 15}" width="9" height="9" rx="1" fill="{MUTED}" opacity=".55"/>')
-    b.append(T(xs["bulk"] + 60, 232, "TCGA breast", 12, INK, anchor="middle", weight=600))
-    b.append(T(xs["bulk"] + 60, 248, "tumours · survival", 12, INK, anchor="middle", weight=600))
-    b.append(T(xs["bulk"] + 60, 290, "~1,100 patients", 10.5, MUTED, anchor="middle", mono=True))
-    b.append(T(xs["bulk"] + 60, 304, "no overlap with atlas", 10.5, MUTED, anchor="middle", mono=True))
-    for m, y in ys.items():
-        b.append(arrow(xs["sig"] + 110, y + 26, xs["bulk"] - 4, 195))
-    # outcome
-    b.append(T(xs["out"] + 40, 100, "6  READ", 10.5, MUTED, anchor="middle", mono=True, weight=600))
-    b.append(box(xs["out"], 120, 80, 150))
-    # tiny ladder
-    for i, (lab, yy, c) in enumerate([("ref", 150, INK), ("test", 180, COL["scgpt"]), ("base", 210, COL["hvg_pca"]), ("floor", 240, AXIS)]):
-        b.append(line(xs["out"] + 14, yy, xs["out"] + 66, yy, stroke=c, sw=2 if lab != "floor" else 1.2, dash="" if lab != "floor" else "3 3"))
-        b.append(T(xs["out"] + 40, yy - 9, lab, 9.5, MUTED, anchor="middle", mono=True))
-    b.append(arrow(xs["bulk"] + 120, 195, xs["out"] - 4, 195))
-    b.append(T(xs["out"] + 40, 290, "against a", 10.5, MUTED, anchor="middle", mono=True))
-    b.append(T(xs["out"] + 40, 304, "ladder", 10.5, MUTED, anchor="middle", mono=True))
-    # bottom caption
-    b.append(line(20, 340, 960, 340))
-    b.append(T(20, 362, "Every arm sees the same cells and is scored in the same patients. The only thing that differs between the three rows is how the cells were summarised.", 12.5, INK))
-    b.append(T(20, 382, "So any difference in how well their cell states predict survival is a difference in what each method learned — and the baseline row is what no learning at all achieves.", 12.5, MUTED))
+            b.append(f'<rect x="{540 + i * 17}" y="{26 + j * 17}" width="11" height="12" rx="1" fill="{MUTED}" opacity=".55"/>')
+    b.append(T(660, 34, "bulk tumour cohort", 13, INK, weight=600))
+    b.append(T(660, 58, "~1,100 patients, one RNA profile", 12, MUTED))
+    b.append(T(660, 76, "each, with follow-up, used only", 12, MUTED))
+    b.append(T(660, 94, "to test signatures on survival", 12, MUTED))
+    b.append(T(740, 138, "TCGA-BRCA via UCSC Xena · OS, PFI · age, stage, PAM50", 10, MUTED, anchor="middle", mono=True))
+    b.append(T(490, 60, "∅", 24, INK, anchor="middle"))
+    b.append(T(490, 168, "No patient appears in both cohorts.", 12.5, INK, anchor="middle", weight=600))
+    return svg(W, H, "".join(b), "Two cohorts with no shared patients")
+
+
+def fig_flow():
+    """Atlas -> three representations -> states -> signatures -> bulk cohort -> ladder."""
+    import random
+    W, H = 980, 262
+    b = []
+    X = {"atlas": 20, "rep": 165, "states": 350, "sig": 535, "bulk": 680, "out": 850}
+    rows = {"hvg_pca": 44, "scgpt": 114, "geneformer": 184}   # top of each 56-high row
+    RH = 56
+    cy = lambda y: y + RH / 2
+    mid = 44 + 70 + 28   # 142: vertical centre of the middle row
+    head = lambda x, w, s: T(x + w / 2, 18, s, 10, MUTED, anchor="middle", mono=True, weight=600)
+    # 1 atlas
+    b.append(head(X["atlas"], 110, "1 · ONE INPUT"))
+    b.append(box(X["atlas"], 44, 110, 196))
+    b.append(cells_glyph(X["atlas"] + 2, 56, n=36, seed=5, r=2.2, fill=MUTED))
+    b.append(cells_glyph(X["atlas"] + 2, 106, n=30, seed=9, r=2.2, fill="#8A9298"))
+    b.append(cells_glyph(X["atlas"] + 2, 156, n=24, seed=13, r=2.2, fill=MUTED))
+    b.append(T(X["atlas"] + 55, 205, "breast tumour", 11.5, INK, anchor="middle", weight=600))
+    b.append(T(X["atlas"] + 55, 221, "single-cell atlas", 11.5, INK, anchor="middle", weight=600))
+    # 2 representations
+    b.append(head(X["rep"], 150, "2 · THREE VIEWS"))
+    subs = {"hvg_pca": "linear · no learning", "scgpt": "foundation model", "geneformer": "foundation model"}
+    for m, y in rows.items():
+        b.append(box(X["rep"], y, 150, RH, stroke=COL[m], sw=1.5))
+        b.append(f'<rect x="{X["rep"]}" y="{y}" width="5" height="{RH}" rx="2" fill="{COL[m]}"/>')
+        b.append(T(X["rep"] + 16, y + 20, NAME[m].replace(" (baseline)", ""), 12.5, INK, weight=600))
+        b.append(T(X["rep"] + 16, y + 39, subs[m], 10, MUTED, mono=True))
+        b.append(arrow(X["atlas"] + 110, mid, X["rep"] - 3, cy(y)))
+    # 3 states
+    b.append(head(X["states"], 150, "3 · CELL STATES"))
+    seeds = {"hvg_pca": 1, "scgpt": 2, "geneformer": 3}
+    for m, y in rows.items():
+        b.append(box(X["states"], y, 150, RH))
+        rnd = random.Random(seeds[m])
+        for k in range(3):
+            cx = X["states"] + 20 + k * 21
+            for _ in range(7):
+                b.append(f'<circle cx="{cx + rnd.uniform(-6, 6):.1f}" cy="{cy(y) + rnd.uniform(-11, 11):.1f}" r="2" fill="{COL[m]}" opacity=".8"/>')
+        b.append(T(X["states"] + 86, cy(y) - 8, "groups of", 10.5, MUTED))
+        b.append(T(X["states"] + 86, cy(y) + 8, "similar cells", 10.5, MUTED))
+        b.append(arrow(X["rep"] + 150, cy(y), X["states"] - 3, cy(y)))
+    # 4 signatures
+    b.append(head(X["sig"], 100, "4 · MARKER GENES"))
+    for m, y in rows.items():
+        b.append(box(X["sig"], y, 100, RH))
+        for i, wl in enumerate([68, 50, 60, 38]):
+            b.append(f'<rect x="{X["sig"] + 16}" y="{y + 11 + i * 10}" width="{wl}" height="4" rx="2" fill="{COL[m]}" opacity="{.95 - i * .18:.2f}"/>')
+        b.append(arrow(X["states"] + 150, cy(y), X["sig"] - 3, cy(y)))
+    # 5 bulk
+    b.append(head(X["bulk"], 120, "5 · SECOND COHORT"))
+    b.append(box(X["bulk"], 44, 120, 196))
+    for i in range(6):
+        for j in range(6):
+            b.append(f'<rect x="{X["bulk"] + 17 + i * 15}" y="{58 + j * 15}" width="10" height="10" rx="1" fill="{MUTED}" opacity=".55"/>')
+    b.append(T(X["bulk"] + 60, 168, "TCGA breast", 11.5, INK, anchor="middle", weight=600))
+    b.append(T(X["bulk"] + 60, 184, "tumours", 11.5, INK, anchor="middle", weight=600))
+    b.append(T(X["bulk"] + 60, 208, "~1,100 patients", 10, MUTED, anchor="middle", mono=True))
+    b.append(T(X["bulk"] + 60, 223, "with follow-up", 10, MUTED, anchor="middle", mono=True))
+    for m, y in rows.items():
+        b.append(arrow(X["sig"] + 100, cy(y), X["bulk"] - 3, mid))
+    # 6 ladder
+    b.append(head(X["out"], 110, "6 · READ"))
+    b.append(box(X["out"], 44, 110, 196))
+    for lab, yy, c, dash in [("reference", 80, INK, "6 3"), ("test", 120, COL["scgpt"], ""),
+                             ("baseline", 160, COL["hvg_pca"], ""), ("floor", 200, MUTED, "2 3")]:
+        b.append(T(X["out"] + 55, yy - 12, lab, 10, MUTED, anchor="middle", mono=True))
+        b.append(line(X["out"] + 18, yy, X["out"] + 92, yy, stroke=c, sw=2.2 if not dash else 1.5, dash=dash))
+    b.append(arrow(X["bulk"] + 120, mid, X["out"] - 3, mid))
     return svg(W, H, "".join(b), "Design flow from one atlas through three representations to survival in a second cohort")
 
 
 def fig_ladder_schematic():
-    """The ladder as a horizontal axis of concordance with rungs and the reported gaps."""
-    W, H = 980, 300
-    x0, x1 = 90, 900
-    axis_y = 200
+    W, H = 980, 262
+    x0, x1, ay = 60, 920, 196
 
-    def X(c):  # map concordance 0.5..0.8
+    def X(c):
         return x0 + (c - 0.5) / 0.3 * (x1 - x0)
-    b = []
-    b.append(line(x0, axis_y, x1, axis_y, stroke=INK, sw=1.2))
+    b = [line(x0, ay, x1, ay, stroke=INK, sw=1.2)]
     for c in (0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8):
-        b.append(line(X(c), axis_y, X(c), axis_y + 6, stroke=INK))
-        b.append(T(X(c), axis_y + 20, f"{c:.2f}", 11, MUTED, anchor="middle", mono=True))
-    b.append(T((x0 + x1) / 2, axis_y + 44, "concordance index — chance that, of two patients, the one the signature calls higher-risk is the one who dies first", 12, MUTED, anchor="middle"))
-    b.append(T(X(0.5), axis_y + 62, "0.50 = coin flip", 11, MUTED, anchor="middle", mono=True))
-    rungs = [
-        ("null", 0.53, AXIS, "6 4", "outcomes shuffled across patients"),
-        ("floor", 0.57, MUTED, "3 3", "random gene sets of the same size and expression"),
-        ("baseline", 0.63, COL["hvg_pca"], "", "HVG-PCA cell states"),
-        ("test", 0.69, COL["scgpt"], "", "scGPT / Geneformer cell states"),
-        ("reference", 0.74, INK, "8 4", "PAM50 subtype — where the field already is"),
-    ]
-    for i, (lab, c, col, dash, desc) in enumerate(rungs):
+        b.append(line(X(c), ay, X(c), ay + 6, stroke=INK))
+        b.append(T(X(c), ay + 20, f"{c:.2f}", 11, MUTED, anchor="middle", mono=True))
+    b.append(T((x0 + x1) / 2, ay + 46, "concordance index: how often, of two patients, the higher-scored one dies first (0.50 = coin flip)", 12, MUTED, anchor="middle"))
+    rungs = [("null", 0.53, AXIS, "6 4", "outcomes shuffled"),
+             ("floor", 0.57, MUTED, "3 3", "matched random genes"),
+             ("baseline", 0.63, COL["hvg_pca"], "", "HVG-PCA states"),
+             ("test", 0.69, COL["scgpt"], "", "scGPT / Geneformer"),
+             ("reference", 0.74, INK, "8 4", "PAM50 subtype")]
+    for lab, c, col, dash, desc in rungs:
         x = X(c)
-        top = 40 + i * 0  # all rungs same height
-        b.append(line(x, 60, x, axis_y - 2, stroke=col, sw=2.2 if not dash else 1.6, dash=dash))
-        b.append(T(x, 44, lab.upper(), 10.5, col if col != AXIS else MUTED, anchor="middle", mono=True, weight=600))
-        b.append(T(x, 30, desc if lab in ("baseline", "test") else "", 10.5, MUTED, anchor="middle"))
-    # descriptions along a second row for the dashed rungs
-    b.append(T(X(0.53), 80, "outcomes shuffled", 10, MUTED, anchor="middle"))
-    b.append(T(X(0.57), 80, "matched random genes", 10, MUTED, anchor="middle"))
-    b.append(T(X(0.74), 80, "PAM50 subtype", 10, MUTED, anchor="middle"))
-    # gaps
-    yg = 130
-    b.append(f'<path d="M{X(0.57)},{yg} L{X(0.69)},{yg}" stroke="{COL["scgpt"]}" stroke-width="1.4" marker-end="url(#arr)" marker-start="url(#arr)"/>')
-    b.append(T((X(0.57) + X(0.69)) / 2, yg - 12, "P1 · test above floor", 11, INK, anchor="middle", mono=True))
-    yg2 = 165
-    b.append(f'<path d="M{X(0.63)},{yg2} L{X(0.69)},{yg2}" stroke="{INK}" stroke-width="1.8" marker-end="url(#arr)" marker-start="url(#arr)"/>')
-    b.append(T((X(0.63) + X(0.69)) / 2, yg2 - 12, "P2 · the margin the study reports", 11, INK, anchor="middle", mono=True, weight=600))
-    b.append(T(x1 + 4, 60, "positions are", 9.5, MUTED, mono=True))
-    b.append(T(x1 + 4, 72, "illustrative", 9.5, MUTED, mono=True))
+        b.append(T(x, 16, lab.upper(), 10.5, MUTED if col == AXIS else col, anchor="middle", mono=True, weight=600))
+        b.append(T(x, 34, desc, 10.5, MUTED, anchor="middle"))
+        b.append(line(x, 48, x, ay - 1, stroke=col, sw=2.4 if not dash else 1.6, dash=dash))
+    for (a, c2), yy, lab, w in [((0.57, 0.69), 100, "P1 · test above floor", 500), ((0.63, 0.69), 150, "P2 · margin over baseline", 600)]:
+        b.append(f'<line x1="{X(a) + 3}" y1="{yy}" x2="{X(c2) - 3}" y2="{yy}" stroke="{INK}" stroke-width="1.6" marker-end="url(#arr)" marker-start="url(#arr)"/>')
+        b.append(T((X(a) + X(c2)) / 2, yy - 13, lab, 11, INK, anchor="middle", mono=True, weight=w, halo=True))
     return svg(W, H, "".join(b), "Schematic ladder of concordance rungs: null, floor, baseline, test, reference")
 
 
 def fig_shared_input():
-    W, H = 980, 230
-    b = []
-    # matrix
-    b.append(box(40, 40, 150, 140, fill="#F2F4F5"))
     import random
+    W, H = 980, 206
+    b = [box(30, 14, 150, 132, fill="#F2F4F5")]
     rnd = random.Random(11)
     for i in range(10):
         for j in range(9):
-            o = rnd.choice([.1, .2, .35, .55, .8])
-            b.append(f'<rect x="{50 + i * 13}" y="{50 + j * 13}" width="11" height="11" fill="{INK}" opacity="{o}"/>')
-    b.append(T(115, 196, "the same cells × genes", 11.5, INK, anchor="middle", weight=600))
-    b.append(T(115, 212, "expression matrix", 11.5, INK, anchor="middle", weight=600))
-    ys = {"hvg_pca": 50, "scgpt": 100, "geneformer": 150}
-    for m, y in ys.items():
-        b.append(arrow(190, 110, 300, y + 15))
-        b.append(box(304, y, 150, 30, stroke=COL[m], sw=1.5))
-        b.append(T(379, y + 15, NAME[m].replace(" (baseline)", ""), 12, INK, anchor="middle", weight=600))
-        b.append(arrow(454, y + 15, 560, y + 15))
-        b.append(box(564, y, 120, 30))
-        b.append(T(624, y + 15, "signature", 11.5, MUTED, anchor="middle", mono=True))
-        b.append(arrow(684, y + 15, 760, 110))
-    b.append(box(764, 80, 190, 60, fill="#F2F4F5"))
-    b.append(T(859, 100, "scored in the same", 11.5, INK, anchor="middle"))
-    b.append(T(859, 118, "bulk tumour genes", 11.5, INK, anchor="middle"))
-    b.append(T(500, 200, "Signal that appears in all three rows can come from the shared input, not from anything a model learned.", 12.5, INK, anchor="middle"))
-    b.append(T(500, 218, "The baseline row is what the shared input yields with no learned model — so every claim is the margin over it.", 12.5, MUTED, anchor="middle"))
+            b.append(f'<rect x="{40 + i * 13}" y="{22 + j * 13}" width="11" height="11" fill="{INK}" opacity="{rnd.choice([.1, .2, .35, .55, .8])}"/>')
+    b.append(T(105, 165, "the same cells × genes", 11.5, INK, anchor="middle", weight=600))
+    b.append(T(105, 182, "expression matrix", 11.5, INK, anchor="middle", weight=600))
+    for m, y in {"hvg_pca": 20, "scgpt": 70, "geneformer": 120}.items():
+        b.append(arrow(180, 80, 300, y + 15))
+        b.append(box(304, y, 160, 30, stroke=COL[m], sw=1.5))
+        b.append(T(384, y + 15, NAME[m].replace(" (baseline)", ""), 12, INK, anchor="middle", weight=600))
+        b.append(arrow(464, y + 15, 570, y + 15))
+        b.append(box(574, y, 120, 30))
+        b.append(T(634, y + 15, "signature", 11, MUTED, anchor="middle", mono=True))
+        b.append(arrow(694, y + 15, 760, 80))
+    b.append(box(764, 50, 190, 60, fill="#F2F4F5"))
+    b.append(T(859, 71, "scored in the same", 11.5, INK, anchor="middle"))
+    b.append(T(859, 89, "bulk tumour genes", 11.5, INK, anchor="middle"))
     return svg(W, H, "".join(b), "All three representations are built from one expression matrix and scored on the same genes")
 
 
-def fig_cohorts():
-    W, H = 980, 150
-    b = []
-    b.append(box(40, 20, 400, 100))
-    b.append(cells_glyph(60, 30, n=40, seed=2, fill=MUTED))
-    b.append(cells_glyph(110, 36, n=30, seed=7, fill="#8A9298"))
-    b.append(T(200, 50, "single-cell atlas", 13, INK, weight=600))
-    b.append(T(200, 70, "tens of thousands of cells from a few dozen tumours", 11.5, MUTED))
-    b.append(T(200, 90, "used to find cell states and their marker genes", 11.5, MUTED))
-    b.append(T(240, 135, "CELLxGENE Census · disease = breast cancer · primary data", 10.5, MUTED, anchor="middle", mono=True))
-    b.append(box(540, 20, 400, 100))
-    for i in range(10):
-        for j in range(4):
-            b.append(f'<rect x="{560 + i * 13}" y="{34 + j * 17}" width="9" height="12" rx="1" fill="{MUTED}" opacity=".55"/>')
-    b.append(T(700, 50, "bulk tumour cohort", 13, INK, weight=600))
-    b.append(T(700, 70, "~1,100 patients · one RNA profile each · follow-up", 11.5, MUTED))
-    b.append(T(700, 90, "used only to test the signatures against survival", 11.5, MUTED))
-    b.append(T(740, 135, "TCGA-BRCA via UCSC Xena · OS and PFI · age, stage, PAM50", 10.5, MUTED, anchor="middle", mono=True))
-    b.append(T(490, 60, "∅", 22, INK, anchor="middle"))
-    b.append(T(490, 84, "no shared", 10, MUTED, anchor="middle", mono=True))
-    b.append(T(490, 96, "patients", 10, MUTED, anchor="middle", mono=True))
-    return svg(W, H, "".join(b), "Two cohorts with no shared patients")
-
-
 def fig_prediction(kind):
-    """Small pass/fail glyph for each prediction."""
-    W, H = 300, 96
+    W, H = 220, 108
     b = []
     if kind == "P1":
-        b.append(line(20, 70, 280, 70, stroke=INK))
-        b.append(line(90, 30, 90, 70, stroke=MUTED, sw=1.4, dash="3 3")); b.append(T(90, 20, "floor", 10, MUTED, anchor="middle", mono=True))
-        b.append(line(190, 30, 190, 70, stroke=COL["scgpt"], sw=2.2)); b.append(T(190, 20, "FM state", 10, COL["scgpt"], anchor="middle", mono=True))
-        b.append(f'<path d="M96,50 L184,50" stroke="{INK}" stroke-width="1.4" marker-end="url(#arr)"/>')
-        b.append(T(150, 86, "concordance →", 10, MUTED, anchor="middle", mono=True))
+        b.append(line(10, 68, 210, 68, stroke=INK))
+        b.append(T(70, 20, "floor", 10, MUTED, anchor="middle", mono=True))
+        b.append(line(70, 30, 70, 68, stroke=MUTED, sw=1.4, dash="3 3"))
+        b.append(T(150, 20, "FM state", 10, COL["scgpt"], anchor="middle", mono=True))
+        b.append(line(150, 30, 150, 68, stroke=COL["scgpt"], sw=2.4))
+        b.append(arrow(76, 50, 144, 50, stroke=INK, sw=1.4))
+        b.append(T(110, 90, "concordance →", 10, MUTED, anchor="middle", mono=True))
     elif kind == "P2":
-        b.append(line(150, 20, 150, 70, stroke=INK))
-        b.append(T(150, 86, "0", 10, MUTED, anchor="middle", mono=True))
-        b.append(line(170, 40, 250, 40, stroke=COL["scgpt"], sw=3)); b.append(f'<circle cx="210" cy="40" r="4" fill="{COL["scgpt"]}"/>')
-        b.append(T(262, 40, "pass", 10, COL["scgpt"], mono=True))
-        b.append(line(110, 58, 200, 58, stroke=AXIS, sw=3)); b.append(f'<circle cx="155" cy="58" r="4" fill="{AXIS}"/>')
-        b.append(T(60, 58, "fail", 10, MUTED, anchor="middle", mono=True))
-        b.append(T(150, 10, "FM − baseline, patient bootstrap", 10, MUTED, anchor="middle", mono=True))
+        b.append(T(110, 10, "FM − baseline", 10, MUTED, anchor="middle", mono=True))
+        b.append(line(110, 22, 110, 72, stroke=INK))
+        b.append(T(110, 88, "0 = no gain", 10, MUTED, anchor="middle", mono=True))
+        b.append(line(124, 40, 200, 40, stroke=COL["scgpt"], sw=3)); b.append(f'<circle cx="162" cy="40" r="4" fill="{COL["scgpt"]}"/>')
+        b.append(T(8, 40, "pass", 10, COL["scgpt"], mono=True))
+        b.append(line(30, 62, 130, 62, stroke=AXIS, sw=3)); b.append(f'<circle cx="80" cy="62" r="4" fill="{AXIS}"/>')
+        b.append(T(150, 62, "fail", 10, MUTED, mono=True))
     elif kind == "P3":
         for i, lab in enumerate(["LumA", "LumB", "Basal"]):
-            x = 40 + i * 90
-            b.append(box(x, 26, 70, 44, fill="#F2F4F5"))
-            b.append(T(x + 35, 18, lab, 10, MUTED, anchor="middle", mono=True))
-            # two tiny survival curves
-            hi = COL["scgpt"] if i == 2 else AXIS
-            b.append(f'<path d="M{x + 8},34 L{x + 30},44 L{x + 50},52 L{x + 62},60" stroke="{INK}" fill="none" stroke-width="1.2"/>')
-            gap = 14 if i == 2 else 3
-            b.append(f'<path d="M{x + 8},34 L{x + 30},{44 - gap} L{x + 50},{52 - gap} L{x + 62},{60 - gap}" stroke="{hi}" fill="none" stroke-width="1.6"/>')
-        b.append(T(150, 86, "survival split within a PAM50 subtype", 10, MUTED, anchor="middle", mono=True))
-    elif kind == "P4":
-        b.append(box(30, 26, 240, 44, fill="#F2F4F5"))
-        b.append(f'<rect x="30" y="26" width="110" height="44" rx="3" fill="{AXIS}" opacity=".5"/>')
-        b.append(T(85, 48, "HVG set", 10.5, INK, anchor="middle", mono=True))
-        b.append(T(205, 48, "other genes", 10.5, MUTED, anchor="middle", mono=True))
+            x = 8 + i * 72
+            b.append(T(x + 32, 16, lab, 10, MUTED, anchor="middle", mono=True))
+            b.append(box(x, 26, 64, 46, fill="#F2F4F5"))
+            gap = 15 if i == 2 else 3
+            b.append(f'<path d="M{x + 7},34 L{x + 28},44 L{x + 46},52 L{x + 58},62" stroke="{INK}" fill="none" stroke-width="1.2"/>')
+            b.append(f'<path d="M{x + 7},34 L{x + 28},{44 - gap} L{x + 46},{52 - gap} L{x + 58},{62 - gap}" stroke="{COL["scgpt"] if i == 2 else AXIS}" fill="none" stroke-width="1.8"/>')
+        b.append(T(110, 92, "survival split within a subtype", 10, MUTED, anchor="middle", mono=True))
+    else:
         import random
+        b.append(box(10, 14, 200, 44, fill="#F2F4F5"))
+        b.append(f'<rect x="10" y="14" width="90" height="44" rx="3" fill="{AXIS}" opacity=".5"/>')
         rnd = random.Random(4)
         for _ in range(10):
-            b.append(f'<circle cx="{150 + rnd.uniform(6, 112):.0f}" cy="{rnd.uniform(30, 66):.0f}" r="3" fill="{COL["geneformer"]}"/>')
+            b.append(f'<circle cx="{rnd.uniform(112, 200):.0f}" cy="{rnd.uniform(20, 52):.0f}" r="3" fill="{COL["geneformer"]}"/>')
         for _ in range(3):
-            b.append(f'<circle cx="{rnd.uniform(36, 130):.0f}" cy="{rnd.uniform(30, 66):.0f}" r="3" fill="{COL["geneformer"]}"/>')
-        b.append(T(150, 86, "where the signature's genes fall", 10, MUTED, anchor="middle", mono=True))
+            b.append(f'<circle cx="{rnd.uniform(18, 92):.0f}" cy="{rnd.uniform(20, 52):.0f}" r="3" fill="{COL["geneformer"]}"/>')
+        b.append(T(55, 72, "HVG set", 10, MUTED, anchor="middle", mono=True))
+        b.append(T(155, 72, "other genes", 10, MUTED, anchor="middle", mono=True))
+        b.append(T(110, 96, "where the signature's genes fall", 10, MUTED, anchor="middle", mono=True))
     return svg(W, H, "".join(b), f"Prediction {kind} glyph")
 
 
 def fig_outcomes():
-    """Three miniature ladders: FM wins / sceptics win / both fail."""
-    W, H = 980, 190
+    W, H = 980, 196
     b = []
-    scen = [
-        ("FM wins", {"floor": .56, "base": .62, "test": .70, "ref": .74}, "test clearly above baseline, both above floor"),
-        ("Sceptics win", {"floor": .56, "base": .64, "test": .645, "ref": .74}, "test ≈ baseline, both below the reference"),
-        ("Both fail", {"floor": .56, "base": .565, "test": .57, "ref": .74}, "test ≈ baseline ≈ floor — the translation lost the signal"),
-    ]
+    scen = [("FM wins", {"floor": .56, "base": .62, "test": .70, "ref": .74}, "test clearly above baseline, both above floor"),
+            ("Sceptics win", {"floor": .56, "base": .64, "test": .65, "ref": .74}, "test ≈ baseline, both below the reference"),
+            ("Both fail", {"floor": .56, "base": .575, "test": .585, "ref": .74}, "test ≈ baseline ≈ floor: signal lost")]
     for i, (title, v, desc) in enumerate(scen):
         x0 = 30 + i * 320
-        b.append(box(x0, 16, 290, 150))
-        b.append(T(x0 + 14, 36, title, 13, INK, weight=600))
-        ax = 120
-        b.append(line(x0 + 20, ax, x0 + 270, ax, stroke=INK))
-
-        def X(c):
-            return x0 + 20 + (c - .5) / .3 * 250
-        for lab, c, col, dash in [("floor", v["floor"], MUTED, "3 3"), ("base", v["base"], COL["hvg_pca"], ""), ("test", v["test"], COL["scgpt"], ""), ("ref", v["ref"], INK, "8 4")]:
-            b.append(line(X(c), 56, X(c), ax, stroke=col, sw=2 if not dash else 1.4, dash=dash))
-            yl = 48 if lab != "test" else 66
-            if lab == "test" and abs(v["test"] - v["base"]) < .02:
-                b.append(T(X(c) + 4, 66, "test", 9.5, COL["scgpt"], mono=True))
-                continue
-            b.append(T(X(c), 48, lab, 9.5, col if col != MUTED else MUTED, anchor="middle", mono=True))
-        b.append(T(x0 + 14, 146, desc, 10.5, MUTED))
+        b.append(box(x0, 10, 290, 128))
+        b.append(T(x0 + 16, 30, title, 13, INK, weight=600))
+        ay = 100
+        b.append(line(x0 + 20, ay, x0 + 270, ay, stroke=INK))
+        Xc = lambda c: x0 + 20 + (c - .5) / .3 * 250
+        for c, col, dash, sw in [(v["floor"], MUTED, "3 3", 1.6), (v["base"], COL["hvg_pca"], "", 2.4),
+                                 (v["test"], COL["scgpt"], "", 2.4), (v["ref"], INK, "8 4", 1.6)]:
+            b.append(line(Xc(c), 46, Xc(c), ay, stroke=col, sw=sw, dash=dash))
+        b.append(T(x0 + 16, 120, desc, 10.5, MUTED))
+    lx = 190
+    for lab, col, dash, sw in [("floor", MUTED, "3 3", 1.6), ("baseline", COL["hvg_pca"], "", 2.4),
+                               ("test", COL["scgpt"], "", 2.4), ("reference", INK, "8 4", 1.6)]:
+        b.append(line(lx, 170, lx + 26, 170, stroke=col, sw=sw, dash=dash))
+        b.append(T(lx + 34, 170, lab, 10.5, MUTED, mono=True))
+        lx += 170
     return svg(W, H, "".join(b), "Three possible outcomes shown as miniature ladders")
 
 
@@ -412,10 +380,10 @@ CSS = f"""
 *{{box-sizing:border-box}}
 body{{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;
   -webkit-font-smoothing:antialiased;padding-inline:16px}}
-.wrap{{max-width:1040px;margin:0 auto;padding:34px 0 96px}}
+.wrap{{max-width:1140px;margin:0 auto;padding:34px 0 96px}}
 .topnav{{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 88%,transparent);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);margin-inline:-16px;padding-inline:16px}}
-.topnav .inner{{max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:54px}}
+.topnav .inner{{max-width:1140px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:54px}}
 .topnav .brand{{font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap}}
 .topnav ul{{list-style:none;margin:0;padding:0;display:flex;gap:18px;font-family:var(--mono);font-size:11px;
   letter-spacing:.06em;text-transform:uppercase;overflow-x:auto;scrollbar-width:none}}
@@ -427,15 +395,17 @@ header{{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:34p
   display:flex;gap:14px;flex-wrap:wrap;align-items:center}}
 .status{{display:inline-block;border:1px solid var(--gf);color:var(--gf);border-radius:2px;padding:1px 7px;letter-spacing:.1em}}
 h1{{font-size:clamp(26px,3.6vw,38px);line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance;font-weight:640}}
-.lede{{font-size:17px;color:var(--muted);margin:0 0 16px;max-width:64ch}}
+.lede{{font-size:17px;color:var(--muted);margin:0 0 16px}}
 .repo{{font-family:var(--mono);font-size:12px;color:var(--muted)}}
 .repo a{{color:var(--ink)}}
 h2{{font-size:21px;letter-spacing:-.01em;margin:56px 0 8px;font-weight:640;text-wrap:balance}}
 h3{{font-size:14.5px;font-weight:640;margin:24px 0 8px;display:flex;align-items:center;gap:8px}}
-.sub{{color:var(--muted);font-size:15px;margin:0 0 20px;max-width:70ch}}
-p{{margin:0 0 14px;max-width:72ch}}
+.sub{{color:var(--muted);font-size:15px;margin:0 0 20px}}
+p{{margin:0 0 14px}}
 .panel{{margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:14px 12px 8px}}
 .panel figcaption{{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;padding-left:4px}}
+.svgscroll{{overflow-x:auto}}
+.svgscroll svg{{min-width:760px}}
 .panel svg,.result img{{width:100%;height:auto;display:block}}
 .fig{{margin:18px 0 10px}}
 .arms{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}}
@@ -455,22 +425,22 @@ p{{margin:0 0 14px;max-width:72ch}}
   background:var(--panel);border:1px solid var(--rule);color:var(--muted);font-family:var(--mono);font-size:11px;
   display:flex;align-items:center;justify-content:center}}
 .step h3{{margin:0 0 6px;font-size:15px}}
-.why{{color:var(--muted);font-size:14px;border-left:2px solid var(--rule);padding-left:12px;margin:10px 0 0;max-width:68ch}}
+.why{{color:var(--muted);font-size:14px;border-left:2px solid var(--rule);padding-left:12px;margin:10px 0 0}}
 .preds{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}}
 @media (max-width:720px){{.preds{{grid-template-columns:minmax(0,1fr)}}}}
 .pred{{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:14px 16px 10px;display:grid;
-  grid-template-columns:minmax(0,1fr) 150px;gap:6px 14px;align-items:start}}
+  grid-template-columns:minmax(0,1fr) 220px;gap:6px 16px;align-items:start}}
 @media (max-width:520px){{.pred{{grid-template-columns:minmax(0,1fr)}}}}
 .pred .id{{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);grid-column:1/-1}}
 .pred h3{{margin:0 0 4px;font-size:14.5px}}
 .pred p{{font-size:13.5px;margin:0 0 6px}}
 .pred .ifnot{{font-size:12.5px;color:var(--muted)}}
-.pred svg{{width:100%;height:auto;display:block}}
+.pred svg{{width:220px;max-width:100%;height:auto;display:block;min-width:0}}
 .results{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}}
 @media (max-width:820px){{.results{{grid-template-columns:minmax(0,1fr)}}}}
 .result{{margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:12px 12px 10px}}
 .result figcaption{{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;padding-left:2px}}
-.result .rtext p{{font-size:12.5px;color:var(--muted);margin:8px 0 0;max-width:none}}
+.result .rtext p{{font-size:12.5px;color:var(--muted);margin:8px 0 0}}
 .result .rtext strong{{color:var(--ink);font-weight:600}}
 .pending{{aspect-ratio:2/1;border:1.5px dashed var(--axis);border-radius:3px;background:repeating-linear-gradient(135deg,transparent 0 10px,#F2F4F5 10px 20px);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:12.5px;text-align:center;padding:12px}}
@@ -496,7 +466,7 @@ tr.ref td{{border-top:1px solid var(--axis);color:var(--muted)}}
 @media (max-width:720px){{.conv{{grid-template-columns:minmax(0,1fr)}}}}
 .conv div{{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:14px 16px 8px}}
 .conv h3{{margin:0 0 6px;font-size:14px}}
-.conv p{{font-size:13.5px;color:var(--muted);margin:0 0 8px;max-width:none}}
+.conv p{{font-size:13.5px;color:var(--muted);margin:0 0 8px}}
 .limits li,.refs li{{margin:0 0 8px;font-size:14px}}
 .refs{{padding-left:20px;font-size:13.5px}}
 .refs li{{color:var(--muted)}}
@@ -516,7 +486,7 @@ footer a{{color:var(--ink)}}
 
 
 def panel(fig_html, caption):
-    return f'<figure class="panel fig"><figcaption>{caption}</figcaption>{fig_html}</figure>'
+    return f'<figure class="panel fig"><figcaption>{caption}</figcaption><div class="svgscroll">{fig_html}</div></figure>'
 
 
 def build():
@@ -554,7 +524,7 @@ def build():
          "If so: the claim that these models learn from genes a linear method discards has a concrete, checkable instance."),
     ]
     preds_html = "".join(
-        f'<div class="pred"><span class="id">{pid}</span><div><h3>{t}</h3><p>{d}</p><p class="ifnot">{n}</p></div>{fig_prediction(pid)}</div>'
+        f'<div class="pred"><span class="id">{pid}</span><div><h3>{t}</h3><p>{d}</p><p class="ifnot">{n}</p></div><div>{fig_prediction(pid)}</div></div>'
         for pid, t, d, n in preds)
 
     steps = [
@@ -651,6 +621,7 @@ def build():
 <h2 id="design">What is done, step by step</h2>
 <p class="sub">Six steps, run identically for the three representations. The figure reads left to right; the numbered notes below say what each step is for.</p>
 {panel(fig_flow(), "Design — one atlas, three views, one patient cohort, one ladder")}
+<p><strong>Every view sees the same cells and is scored in the same patients.</strong> The only thing that differs between the three rows is how the cells were summarised, so any difference in how well their cell states predict survival is a difference in what each method learned. The baseline row is what no learning at all achieves.</p>
 <div class="steps">{steps_html}</div>
 
 <h2 id="ladder">The ladder: what every number is read against</h2>
