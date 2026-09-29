@@ -5,7 +5,7 @@ slots: when `results/report/fig_*.png` and `results/ladder/ladder.json` exist th
 (PNGs as data URIs, the ladder as a table); until then each slot shows what the panel will
 contain and how to read it. Re-run after stage 06 to fill the page; nothing else changes.
 
-    python3 docs/artifact/build.py            -> docs/artifact/cell_states_survival.html
+    python3 docs/site/build.py                -> docs/index.html (served by GitHub Pages)
 """
 import base64
 import json
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import config as C  # noqa: E402
 
-OUT = Path(__file__).parent / "cell_states_survival.html"
+OUT = ROOT / "docs" / "index.html"
 REPORT = C.RESULTS / "report"
 LADDER = C.RESULTS / "ladder" / "ladder.json"
 REPO = "https://github.com/Natalija-Stepurko/single-cell-fm-probing"
@@ -638,7 +638,7 @@ def build():
 {predictions_status()}
 
 <h2 id="results">Results</h2>
-<p class="sub">{"The four panels stage 06 writes, and the ladder table." if have_results else "Nothing has run. The four panels below are the ones stage 06 will write, each with what it will show and how to read it; the table has the shape of the final ladder. When the data land, this section fills in and nothing else on the page changes."}</p>
+<p class="sub">{"The four panels stage 06 writes, and the ladder table." if have_results else "The full run is in progress. The four panels below are the ones stage 06 will write, each with what it will show and how to read it; the table has the shape of the final ladder. When the data land, this section fills in and nothing else on the page changes."}</p>
 <div class="results">{results_html}</div>
 <h3>The ladder as a table</h3>
 {ladder_table()}
@@ -685,13 +685,17 @@ def build():
 <ol class="refs">{refs_html}</ol>
 
 <footer>
-<div>Data: CELLxGENE Census (breast cancer, primary data) · TCGA-BRCA via UCSC Xena (HiSeqV2, clinical matrix, TCGA-CDR survival). Both public.</div>
-<div>Pipeline: <a href="{REPO}">single-cell-fm-probing</a> · stages 01–06 · Python, scanpy, lifelines · result panels are written by <code>scripts/06_report.py</code> and embedded by <code>docs/artifact/build.py</code>.</div>
+<div>Data: CELLxGENE Census release 2025-11-08 (breast-carcinoma donors, primary data, 10x assays) · TCGA-BRCA via UCSC Xena (HiSeqV2, clinical matrix, TCGA-CDR survival). Both public.</div>
+<div>Pipeline: <a href="{REPO}">single-cell-fm-probing</a> · stages 01–06 · Python, scanpy, lifelines · result panels are written by <code>scripts/06_report.py</code> and embedded by <code>docs/site/build.py</code>.</div>
 <div>Page built {today}. {"Results embedded." if have_results else "No results embedded."}</div>
 </footer>
 </div>
 """
-    OUT.write_text(html)
+    # head and body tags are optional in HTML; the page stays one self-contained file
+    OUT.write_text('<!doctype html>\n<html lang="en">\n<meta charset="utf-8">\n'
+                   '<meta name="description" content="Do single-cell foundation models find cell '
+                   'states that predict breast-cancer survival better than a linear baseline?">\n'
+                   + html + "\n</html>\n")
     print(f"wrote {OUT}  {OUT.stat().st_size / 1024:.0f} KB  results={'yes' if have_results else 'no'}")
 
 
