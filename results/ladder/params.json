@@ -1,0 +1,65 @@
+{
+  "script": "05_ladder.py",
+  "timestamp_utc": "2026-09-30T09:14:35+00:00",
+  "command": "/data/scfm/scripts/05_ladder.py",
+  "args": {
+    "data_dir": "/data/scfm/data",
+    "states_dir": "/data/scfm/results/states",
+    "translate_dir": "/data/scfm/results/translate",
+    "out_dir": "/data/scfm/results/ladder",
+    "n_boot": 200,
+    "seed": 42,
+    "dry_run": false
+  },
+  "git_commit": "82eb402e057bc492afd9b5968624edf7ec76dd28",
+  "git_dirty": true,
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "torch": "2.14.0+cu130",
+    "xgboost": "3.4.1",
+    "umap": "0.5.12"
+  },
+  "extra": {
+    "predictions": {
+      "scgpt": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": 0.030102702470367358,
+        "P2_margin_ci": [
+          -0.04898346109003071,
+          0.10227455647089594
+        ],
+        "P2_pass": false,
+        "P4_hvg_frac": 0.12,
+        "P4_pass": true,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.5491202346041055,
+          "Her2": 0.4891304347826087,
+          "LumA": 0.4651101437805039,
+          "LumB": 0.5831188883170355
+        },
+        "P3_pass": false
+      },
+      "geneformer": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": -0.0024829018969266346,
+        "P2_margin_ci": [
+          -0.07913772722152342,
+          0.06901878151579913
+        ],
+        "P2_pass": false,
+        "P4_hvg_frac": 0.21,
+        "P4_pass": true,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.5293255131964809,
+          "Her2": 0.3695652173913043,
+          "LumA": 0.4054874027173196,
+          "LumB": 0.5826042202779207
+        },
+        "P3_pass": false
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ contain and how to read it. Re-run after stage 06 to fill the page; nothing else
     python3 docs/site/build.py                -> docs/index.html (served by GitHub Pages)
 """
 import base64
+from urllib.parse import quote
 import json
 import sys
 from datetime import date
@@ -317,32 +318,36 @@ def data_uri(p: Path):
     return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
 
 
-def result_slot(name, title, what, read):
+def result_slot(name, title, what, read, wide=False):
     p = REPORT / f"{name}.png"
     if p.exists():
         img = f'<img src="{data_uri(p)}" alt="{title}">'
+        if wide:
+            img = f'<div class="imgscroll">{img}</div>'
         state = ""
     else:
         img = (f'<div class="pending"><span class="pending-k">{name}.png</span>'
                f'<span>Result panel — fills in when stage 06 runs.</span></div>')
         state = ' data-pending="true"'
-    return (f'<figure class="result" data-slot="{name}"{state}>'
+    return (f'<figure class="result{" wide" if wide else ""}" data-slot="{name}"{state}>'
             f'<figcaption><span class="rk">{title}</span></figcaption>{img}'
             f'<div class="rtext"><p><strong>What it shows.</strong> {what}</p><p><strong>How to read it.</strong> {read}</p></div>'
             f'</figure>')
 
 
-def ladder_table():
+def ladder_table(sensitivity=False):
     rows = []
     have = LADDER.exists()
     L = json.load(open(LADDER)) if have else None
     order = ["hvg_pca", "scgpt", "geneformer"]
-    by = {r["model"]: r for r in L["ladder"]} if have else {}
+    src = (L["sensitivity"]["ladder"] if sensitivity else L["ladder"]) if have else []
+    by = {r["model"]: r for r in src}
     for m in order:
         r = by.get(m)
         sw = f'<span class="swatch" style="background:{COL[m]}"></span>'
         if r:
-            rows.append(f'<tr><td>{sw}{NAME[m]}</td><td>{r["top_cell_type"]}</td>'
+            ct = r["top_cell_type"] + (f' · {r["direction"]}' if sensitivity else "")
+            rows.append(f'<tr><td>{sw}{NAME[m]}</td><td>{ct}</td>'
                         f'<td class="num">{r["cindex"]:.3f}</td><td class="num">{r["ci_lo"]:.3f}–{r["ci_hi"]:.3f}</td>'
                         f'<td class="num">{r["floor_mean"]:.3f}</td><td class="num">{r["above_floor"]:+.3f}</td>'
                         f'<td class="num">{r["null_p95"]:.3f}</td><td class="num">{r["hvg_frac"]:.2f}</td></tr>')
@@ -358,12 +363,13 @@ def ladder_table():
             f'<p class="sub" style="margin-top:8px">{meta}. One row per representation: its best cell state, chosen by margin above its own floor, not by raw score.</p>')
 
 
-def predictions_status():
+def predictions_status(sensitivity=False):
     if not LADDER.exists():
         return ""
     L = json.load(open(LADDER))
+    P = L["sensitivity"]["predictions"] if sensitivity else L["predictions"]
     out = ['<div class="pstatus">']
-    for m, p in L["predictions"].items():
+    for m, p in P.items():
         cells = "".join(f'<span class="pill {"on" if p[k] else "off"}">{k.split("_")[0]} {"pass" if p[k] else "fail"}</span>'
                         for k in ("P1_above_floor", "P2_pass", "P3_pass", "P4_pass"))
         out.append(f'<div><span class="swatch" style="background:{COL[m]}"></span><strong>{NAME[m]}</strong> {cells}</div>')
@@ -371,7 +377,81 @@ def predictions_status():
     return "".join(out)
 
 
+def findings_html():
+    if not LADDER.exists():
+        return ""
+    L = json.load(open(LADDER))
+    P = L["predictions"]
+    fm = [m for m in ("scgpt", "geneformer") if m in P]
+    margins = "; ".join(f'{NAME[m]} {P[m]["P2_margin_over_baseline"]:+.3f} '
+                        f'(95% interval {P[m]["P2_margin_ci"][0]:+.3f} to {P[m]["P2_margin_ci"][1]:+.3f})'
+                        for m in fm)
+    return (f'<div class="call"><p><strong>Neither foundation model beats the linear baseline.</strong> '
+            f'In {L["n_patients"]:,} TCGA-BRCA patients with {L["n_events"]} deaths, the best '
+            f'signature of every representation stays below its permutation null, so P1 fails for both '
+            f'models. The margin over HVG-PCA is {margins}; both intervals include zero, so P2 fails. '
+            f'PAM50 subtype alone reaches C = {L["reference_pam50"]:.3f}. The sensitivity analysis below, '
+            f'which also credits protective signatures, gives the same answer.</p></div>')
+
+
+def sensitivity_html():
+    if not LADDER.exists() or not json.load(open(LADDER)).get("sensitivity"):
+        return ""
+    L = json.load(open(LADDER))
+    P = L["sensitivity"]["predictions"]
+    p3 = []
+    for m in ("scgpt", "geneformer"):
+        if m in P and P[m]["P3_pass"]:
+            st, v = max(P[m]["P3_within_subtype_cindex"].items(), key=lambda kv: kv[1])
+            p3.append(f"{NAME[m]} in {st} (C = {v:.3f})")
+    p3_txt = (" P3 passes for " + " and ".join(p3) + ". P3 is a single threshold of 0.6 applied "
+              "across four subtypes, with no null of its own, and these signatures do not pass P1; "
+              "the within-subtype values are leads for replication, not findings.") if p3 else ""
+    fig = REPORT / "fig_ladder_sensitivity.png"
+    img = f'<figure class="result narrow"><img src="{data_uri(fig)}" alt="Sensitivity ladder"></figure>' if fig.exists() else ""
+    return (f'<h2 id="sensitivity">Sensitivity analysis: protective signatures</h2>'
+            f'<p class="sub">Added after the primary run. The primary ladder is unchanged.</p>'
+            f'<p>The pre-registered concordance index credits a signature only when a higher score means '
+            f'worse survival. Many signatures work the other way: a higher score means longer survival. '
+            f'They include the largest departures from 0.5 in the run, down to C = 0.40. Here every '
+            f'signature is read in the direction it acts. Its floor is oriented the same way, and the '
+            f'permutation null takes the best of max(C, 1 − C) over the same 500 permutations.</p>'
+            f'{img}{ladder_table(sensitivity=True)}{predictions_status(sensitivity=True)}'
+            f'<p>The best state of every representation is a protective malignant-cell state, and every one '
+            f'sits just below its null. HVG-PCA is still the strongest.{p3_txt}</p>')
+
+
 # ----------------------------------------------------------------------------- page
+# the ladder chart in miniature: three bars in the view colours and the null tick
+FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">'
+           '<rect width="32" height="32" rx="6" fill="#16191D"/>'
+           '<rect x="6" y="7" width="15" height="4.5" rx="1" fill="#C9CED3"/>'
+           '<rect x="6" y="14" width="18" height="4.5" rx="1" fill="#2FA39B"/>'
+           '<rect x="6" y="21" width="13" height="4.5" rx="1" fill="#E08A3C"/>'
+           '<rect x="24.5" y="5" width="2" height="22" rx="1" fill="#FFFFFF"/></svg>')
+
+NAV_JS = """
+(()=>{
+  const nav=document.querySelector('.topnav'), btn=nav.querySelector('.navtoggle');
+  const links=[...nav.querySelectorAll('ul a')];
+  const byId=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const setOpen=o=>{nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',String(o));};
+  btn.addEventListener('click',()=>setOpen(!nav.classList.contains('open')));
+  links.forEach(a=>a.addEventListener('click',()=>setOpen(false)));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
+  document.addEventListener('click',e=>{if(!nav.contains(e.target))setOpen(false);});
+  const heads=[...byId.keys()].map(id=>document.getElementById(id)).filter(Boolean);
+  const mark=()=>{
+    const y=nav.offsetHeight+24; let cur=null;
+    for(const h of heads){ if(h.getBoundingClientRect().top<=y) cur=h; else break; }
+    links.forEach(a=>{a.classList.remove('active');a.removeAttribute('aria-current');});
+    if(cur){const a=byId.get(cur.id);a.classList.add('active');a.setAttribute('aria-current','true');
+      btn.textContent=a.textContent;} else btn.textContent='Sections';
+  };
+  addEventListener('scroll',mark,{passive:true}); addEventListener('resize',mark); mark();
+})();
+"""
+
 CSS = f"""
 :root{{
   --paper:#F7F8F9; --panel:#FFFFFF; --ink:{INK}; --muted:{MUTED}; --rule:{RULE}; --axis:{AXIS};
@@ -381,15 +461,31 @@ CSS = f"""
 body{{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;
   -webkit-font-smoothing:antialiased;padding-inline:16px}}
 .wrap{{max-width:1140px;margin:0 auto;padding:34px 0 96px}}
-.topnav{{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 88%,transparent);
+html{{scroll-behavior:smooth}}
+h2[id]{{scroll-margin-top:74px}}
+.topnav{{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 90%,transparent);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);margin-inline:-16px;padding-inline:16px}}
-.topnav .inner{{max-width:1140px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:54px}}
-.topnav .brand{{font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap}}
-.topnav ul{{list-style:none;margin:0;padding:0;display:flex;gap:18px;font-family:var(--mono);font-size:11px;
-  letter-spacing:.06em;text-transform:uppercase;overflow-x:auto;scrollbar-width:none}}
-.topnav ul::-webkit-scrollbar{{display:none}}
-.topnav a{{color:var(--muted);text-decoration:none;white-space:nowrap}}
-.topnav a:hover,.topnav a:focus-visible{{color:var(--ink)}}
+.topnav .inner{{max-width:1140px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:54px;position:relative}}
+.topnav .brand{{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap;text-decoration:none}}
+.topnav .brand svg{{width:18px;height:18px;flex:none}}
+.topnav ul{{list-style:none;margin:0;padding:0;display:flex;gap:15px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase}}
+.topnav ul a{{display:block;color:var(--muted);text-decoration:none;white-space:nowrap;padding:17px 0 15px;border-bottom:2px solid transparent}}
+.topnav ul a:hover{{color:var(--ink)}}
+.topnav ul a.active{{color:var(--ink);border-bottom-color:var(--ink)}}
+.navtoggle{{display:none;font:inherit;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px 10px;cursor:pointer;
+  max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.navtoggle::before{{content:"\\2261\\00a0\\00a0";font-size:13px}}
+.navtoggle:focus-visible{{outline:2px solid var(--scgpt);outline-offset:2px}}
+@media (max-width:1180px){{
+  .navtoggle{{display:block}}
+  .topnav ul{{display:none;position:absolute;top:54px;right:0;flex-direction:column;gap:0;min-width:220px;
+    background:var(--panel);border:1px solid var(--rule);border-radius:3px;box-shadow:0 8px 24px rgba(22,25,29,.12);padding:6px 0}}
+  .topnav.open ul{{display:flex}}
+  .topnav ul a{{padding:9px 16px;border-bottom:0;border-left:2px solid transparent}}
+  .topnav ul a.active{{border-left-color:var(--ink);background:var(--band)}}
+}}
 header{{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:34px}}
 .eyebrow{{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;
   display:flex;gap:14px;flex-wrap:wrap;align-items:center}}
@@ -442,6 +538,10 @@ p{{margin:0 0 14px}}
 .result figcaption{{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;padding-left:2px}}
 .result .rtext p{{font-size:12.5px;color:var(--muted);margin:8px 0 0}}
 .result .rtext strong{{color:var(--ink);font-weight:600}}
+.result.wide{{grid-column:1/-1}}
+.result.narrow{{max-width:640px;margin-bottom:14px}}
+.result.wide .imgscroll{{overflow-x:auto}}
+.result.wide .imgscroll img{{min-width:900px}}
 .pending{{aspect-ratio:2/1;border:1.5px dashed var(--axis);border-radius:3px;background:repeating-linear-gradient(135deg,transparent 0 10px,#F2F4F5 10px 20px);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:12.5px;text-align:center;padding:12px}}
 .pending-k{{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink)}}
@@ -492,7 +592,7 @@ def panel(fig_html, caption):
 def build():
     today = date.today().isoformat()
     have_results = LADDER.exists()
-    status = "results in" if have_results else "design complete · results pending"
+    status = "results in · negative" if have_results else "design complete · results pending"
 
     arms = [
         ("hvg_pca", "The baseline: no learning",
@@ -560,17 +660,17 @@ def build():
 
     results_html = "".join([
         result_slot("fig_ladder", "A · the ladder",
-                    "One bar per representation: the concordance index of its best cell-state signature, with a 95% interval from resampling patients. Dotted tick: that signature's matched-random floor. Dashed line: PAM50.",
-                    "Bars that clear their dotted tick pass P1. The distance between the scGPT / Geneformer bars and the HVG-PCA bar is the study's result."),
+                    "One bar per representation: the concordance index of its best cell-state signature, with a 95% interval from resampling patients. Dotted tick: that signature's matched-random floor. Thick tick: the 95th percentile of the permutation null for the best of that representation's signatures. Dashed line: PAM50.",
+                    "A bar that clears both ticks passes P1. The distance between the scGPT / Geneformer bars and the HVG-PCA bar is the study's result."),
         result_slot("fig_margin", "B · the margin over the baseline",
                     "For each foundation model, the difference in concordance from the HVG-PCA baseline, computed on the same 200 patient resamples so the comparison is paired.",
                     "An interval wholly to the right of zero passes P2. An interval straddling zero is the sceptics' result, and is reported as such."),
-        result_slot("fig_km", "C · survival curves, overall and within subtype",
-                    "Kaplan–Meier curves for patients split into thirds by the best foundation-model signature: all patients, then each PAM50 subtype with enough events.",
-                    "Separated curves inside a single subtype panel is P3: the state orders patients that PAM50 puts in one box. Curves that separate only in the all-patients panel mean the state is tracking subtype."),
-        result_slot("fig_hvg", "D · where the informative genes come from",
+        result_slot("fig_hvg", "C · where the informative genes come from",
                     "Every signature from every representation: the fraction of its genes that are HVGs (x) against its concordance above the matched-random floor (y).",
                     "Foundation-model points high on the y-axis and left of 0.5 on the x-axis are P4: prognostic signal built from genes the baseline never saw."),
+        result_slot("fig_km", "D · survival curves, overall and within subtype",
+                    "Kaplan–Meier curves for patients split into thirds by the best foundation-model signature: all patients, then each PAM50 subtype with enough events.",
+                    "Separated curves inside a single subtype panel is P3: the state orders patients that PAM50 puts in one box. Curves that separate only in the all-patients panel mean the state is tracking subtype. Thirds are cut on all patients, so a small subtype can lack one of them.", wide=True),
     ])
 
     refs = [
@@ -591,14 +691,20 @@ def build():
     refs_html = "".join(f'<li>{t} <a href="{u}">{u.replace("https://", "")}</a></li>' for t, u in refs)
 
     nav = "".join(f'<li><a href="#{a}">{t}</a></li>' for a, t in [
-        ("question", "Question"), ("compared", "What is compared"), ("design", "Design"), ("ladder", "Ladder"),
-        ("predictions", "Predictions"), ("results", "Results"), ("conventions", "Conventions"),
+        ("question", "Question"), ("compared", "Compared"), ("design", "Design"), ("ladder", "Ladder"),
+        ("predictions", "Predictions"), ("results", "Results"), ("sensitivity", "Sensitivity"),
+        ("conventions", "Conventions"),
         ("outcomes", "Outcomes"), ("validation", "Validation"), ("limits", "Limits"), ("refs", "References")])
 
     html = f"""<title>Cell states versus survival</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(FAVICON)}">
 <style>{CSS}</style>
-<nav class="topnav"><div class="inner"><span class="brand">cell states → survival</span><ul>{nav}</ul></div></nav>
+<nav class="topnav" aria-label="Sections"><div class="inner">
+<a class="brand" href="#top">{FAVICON}<span>cell states → survival</span></a>
+<button class="navtoggle" type="button" aria-label="Jump to section" aria-expanded="false" aria-controls="navlist">Sections</button>
+<ul id="navlist">{nav}</ul></div></nav>
+<span id="top"></span>
 <div class="wrap">
 <header>
 <p class="eyebrow"><span>Single-cell foundation models · breast cancer · pre-registered design</span><span class="status">{status}</span></p>
@@ -638,10 +744,12 @@ def build():
 {predictions_status()}
 
 <h2 id="results">Results</h2>
-<p class="sub">{"The four panels stage 06 writes, and the ladder table." if have_results else "The full run is in progress. The four panels below are the ones stage 06 will write, each with what it will show and how to read it; the table has the shape of the final ladder. When the data land, this section fills in and nothing else on the page changes."}</p>
+{findings_html()}
+<p class="sub">{"The four panels stage 06 writes, and the ladder table. Everything in this block is the pre-registered analysis." if have_results else "The full run is in progress. The four panels below are the ones stage 06 will write, each with what it will show and how to read it; the table has the shape of the final ladder. When the data land, this section fills in and nothing else on the page changes."}</p>
 <div class="results">{results_html}</div>
 <h3>The ladder as a table</h3>
 {ladder_table()}
+{sensitivity_html()}
 
 <h2 id="conventions">Statistical conventions</h2>
 <p class="sub">Each of these was learned the hard way on an earlier study and is fixed here before any data are seen.</p>
@@ -690,6 +798,7 @@ def build():
 <div>Page built {today}. {"Results embedded." if have_results else "No results embedded."}</div>
 </footer>
 </div>
+<script>{NAV_JS}</script>
 """
     # head and body tags are optional in HTML; the page stays one self-contained file
     OUT.write_text('<!doctype html>\n<html lang="en">\n<meta charset="utf-8">\n'

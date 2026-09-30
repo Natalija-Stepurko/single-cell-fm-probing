@@ -11,6 +11,11 @@ that make those numbers readable:
          credited only for what its *particular* genes add over any genes of that shape
 
 Plus the reference rung: the PAM50 subtype call's own C-index in the same cohort.
+
+Sensitivity analysis (added after the primary run; the primary ladder is unchanged): the
+pre-registered C-index credits a signature only when a higher score means worse survival.
+The *_or columns read each signature in the direction it acts, with a floor oriented the same
+way and a family-wise null over max(C, 1 - C) built from the same permutations.
 Output: results/translate/scores.csv, nulls.json, params.json.
 """
 import argparse
@@ -64,12 +69,30 @@ def _floor_chunk(Z, T, E, sigs_ix):
 
 
 def _null_chunk(S, T, E, seeds):
-    """Per permutation seed: the best C-index over all rows of S against permuted outcomes."""
+    """Per permutation seed, over all rows of S against permuted outcomes: the best C-index
+    (primary, risk direction) and the best max(C, 1 - C) (sensitivity, either direction)."""
     best = []
     for sd in seeds:
         p = np.random.default_rng(int(sd)).permutation(len(T))
-        best.append(max(_ci(T[p], E[p], S[j]) for j in range(len(S))))
+        c = np.array([_ci(T[p], E[p], S[j]) for j in range(len(S))])
+        best.append((float(c.max()), float(np.maximum(c, 1 - c).max())))
     return best
+
+
+def _oriented(ci0, floor):
+    """Sensitivity analysis: read the signature in the direction it acts on the full cohort.
+    A protective signature (C < 0.5) is scored as 1 - C, and so is each of its floor sets,
+    so the floor asks whether the signature beats random genes in its own direction."""
+    if not np.isfinite(ci0):
+        return {"direction": np.nan, "cindex_or": np.nan, "floor_or_mean": np.nan,
+                "floor_or_p95": np.nan, "above_floor_or": np.nan}
+    d = 1 if ci0 >= 0.5 else -1
+    f = [v if d == 1 else 1 - v for v in floor]
+    c = ci0 if d == 1 else 1 - ci0
+    return {"direction": d, "cindex_or": c,
+            "floor_or_mean": float(np.mean(f)) if f else np.nan,
+            "floor_or_p95": float(np.percentile(f, 95)) if f else np.nan,
+            "above_floor_or": c - float(np.mean(f)) if f else np.nan}
 
 
 def main():
@@ -133,17 +156,21 @@ def main():
                          "cindex": ci0, "hr": hr, "p": p,
                          "floor_mean": float(np.mean(floor)) if floor else np.nan,
                          "floor_p95": float(np.percentile(floor, 95)) if floor else np.nan,
-                         "above_floor": ci0 - float(np.mean(floor)) if floor else np.nan})
+                         "above_floor": ci0 - float(np.mean(floor)) if floor else np.nan,
+                         **_oriented(ci0, floor)})
         # family-wise null: best C-index across this model's signatures per permutation
         S = np.vstack(scored)
         seeds = rng.integers(1 << 62, size=args.n_perm)
         best = [v for chunk in par(delayed(_null_chunk)(S, T, E, c)
                                    for c in np.array_split(seeds, C.N_JOBS)) for v in chunk]
+        best, best_or = [b for b, _ in best], [b for _, b in best]
         nulls[model] = {"best_cindex_null_mean": float(np.mean(best)),
                         "best_cindex_null_p95": float(np.percentile(best, 95)),
+                        "best_oriented_null_mean": float(np.mean(best_or)),
+                        "best_oriented_null_p95": float(np.percentile(best_or, 95)),
                         "n_perm": args.n_perm}
-        print(f"  {model}: family-wise null p95 = {nulls[model]['best_cindex_null_p95']:.3f}",
-              flush=True)
+        print(f"  {model}: family-wise null p95 = {nulls[model]['best_cindex_null_p95']:.3f}"
+              f"  (either direction: {nulls[model]['best_oriented_null_p95']:.3f})", flush=True)
 
     # reference rung: PAM50 subtype as a categorical predictor
     ref = {}

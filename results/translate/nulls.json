@@ -1,0 +1,31 @@
+{
+  "nulls": {
+    "hvg_pca": {
+      "best_cindex_null_mean": 0.5562864660265878,
+      "best_cindex_null_p95": 0.5863375492368291,
+      "best_oriented_null_mean": 0.5667064561792221,
+      "best_oriented_null_p95": 0.5939715657311669,
+      "n_perm": 500
+    },
+    "scgpt": {
+      "best_cindex_null_mean": 0.5520849027572624,
+      "best_cindex_null_p95": 0.585172790497292,
+      "best_oriented_null_mean": 0.5622052252584934,
+      "best_oriented_null_p95": 0.5895117860659773,
+      "n_perm": 500
+    },
+    "geneformer": {
+      "best_cindex_null_mean": 0.5518023449039882,
+      "best_cindex_null_p95": 0.5857313207779419,
+      "best_oriented_null_mean": 0.563102227966519,
+      "best_oriented_null_p95": 0.5899664574101428,
+      "n_perm": 500
+    }
+  },
+  "reference": {
+    "pam50_cindex": 0.7445609997591587
+  },
+  "endpoint": "OS",
+  "n_patients": 1094,
+  "n_events": 151
+}

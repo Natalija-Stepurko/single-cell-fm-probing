@@ -1,0 +1,30 @@
+{
+  "script": "04_translate.py",
+  "timestamp_utc": "2026-09-30T09:14:23+00:00",
+  "command": "/data/scfm/scripts/04_translate.py",
+  "args": {
+    "data_dir": "/data/scfm/data",
+    "states_dir": "/data/scfm/results/states",
+    "out_dir": "/data/scfm/results/translate",
+    "endpoint": "OS",
+    "n_perm": 500,
+    "n_floor": 200,
+    "seed": 42,
+    "dry_run": false
+  },
+  "git_commit": "82eb402e057bc492afd9b5968624edf7ec76dd28",
+  "git_dirty": true,
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "torch": "2.14.0+cu130",
+    "xgboost": "3.4.1",
+    "umap": "0.5.12"
+  },
+  "extra": {
+    "n_signatures": 783,
+    "n_events": 151
+  }
+}

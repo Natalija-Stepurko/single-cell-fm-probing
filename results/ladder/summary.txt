@@ -1,0 +1,16 @@
+Ladder — OS, 1094 patients, 151 events
+reference (PAM50) C = 0.745
+
+  hvg_pca     C=0.547 [0.486,0.611]  floor=0.453  null95=0.586  hvg=0.96  exhausted T cell
+  scgpt       C=0.576 [0.514,0.625]  floor=0.502  null95=0.585  hvg=0.12  malignant cell
+  geneformer  C=0.546 [0.485,0.600]  floor=0.491  null95=0.586  hvg=0.21  malignant cell
+
+  scgpt: P1=False P2=False (margin +0.030 [-0.049,+0.102]) P3=False P4=True
+  geneformer: P1=False P2=False (margin -0.002 [-0.079,+0.069]) P3=False P4=True
+
+Sensitivity — each signature read in the direction it acts (added after the primary run)
+  hvg_pca     C=0.591 [0.545,0.636]  floor=0.490  null95=0.594  hvg=0.11  protective  malignant cell
+  scgpt       C=0.583 [0.526,0.631]  floor=0.492  null95=0.590  hvg=0.22  protective  malignant cell
+  geneformer  C=0.578 [0.528,0.631]  floor=0.490  null95=0.590  hvg=0.04  protective  malignant cell
+  scgpt: P1=False P2=False (margin -0.009 [-0.044,+0.022]) P3=True P4=True
+  geneformer: P1=False P2=False (margin -0.013 [-0.076,+0.044]) P3=True P4=True

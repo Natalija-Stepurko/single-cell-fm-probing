@@ -1,0 +1,176 @@
+{
+  "ladder": [
+    {
+      "model": "hvg_pca",
+      "kind": "baseline",
+      "signature": "c21_k50",
+      "resolution": 0.3,
+      "top_cell_type": "exhausted T cell",
+      "cindex": 0.5474366075824717,
+      "ci_lo": 0.48616116467254944,
+      "ci_hi": 0.6113358018224984,
+      "floor_mean": 0.4526698670605614,
+      "above_floor": 0.0947667405219103,
+      "null_p95": 0.5863375492368291,
+      "hvg_frac": 0.96
+    },
+    {
+      "model": "scgpt",
+      "kind": "fm",
+      "signature": "c11_k50",
+      "resolution": 1.0,
+      "top_cell_type": "malignant cell",
+      "cindex": 0.576101674052191,
+      "ci_lo": 0.5140990858214453,
+      "ci_hi": 0.6246106671940412,
+      "floor_mean": 0.5019655496061054,
+      "above_floor": 0.0741361244460856,
+      "null_p95": 0.585172790497292,
+      "hvg_frac": 0.12
+    },
+    {
+      "model": "geneformer",
+      "kind": "fm",
+      "signature": "c14_k100",
+      "resolution": 0.3,
+      "top_cell_type": "malignant cell",
+      "cindex": 0.5464826440177253,
+      "ci_lo": 0.48457417219710885,
+      "ci_hi": 0.599962019061258,
+      "floor_mean": 0.4905243722304284,
+      "above_floor": 0.0559582717872968,
+      "null_p95": 0.5857313207779419,
+      "hvg_frac": 0.21
+    }
+  ],
+  "reference_pam50": 0.7445609997591587,
+  "predictions": {
+    "scgpt": {
+      "P1_above_floor": false,
+      "P2_margin_over_baseline": 0.030102702470367358,
+      "P2_margin_ci": [
+        -0.04898346109003071,
+        0.10227455647089594
+      ],
+      "P2_pass": false,
+      "P4_hvg_frac": 0.12,
+      "P4_pass": true,
+      "P3_within_subtype_cindex": {
+        "Basal": 0.5491202346041055,
+        "Her2": 0.4891304347826087,
+        "LumA": 0.4651101437805039,
+        "LumB": 0.5831188883170355
+      },
+      "P3_pass": false
+    },
+    "geneformer": {
+      "P1_above_floor": false,
+      "P2_margin_over_baseline": -0.0024829018969266346,
+      "P2_margin_ci": [
+        -0.07913772722152342,
+        0.06901878151579913
+      ],
+      "P2_pass": false,
+      "P4_hvg_frac": 0.21,
+      "P4_pass": true,
+      "P3_within_subtype_cindex": {
+        "Basal": 0.5293255131964809,
+        "Her2": 0.3695652173913043,
+        "LumA": 0.4054874027173196,
+        "LumB": 0.5826042202779207
+      },
+      "P3_pass": false
+    }
+  },
+  "endpoint": "OS",
+  "sensitivity": {
+    "note": "each signature read in the direction it acts; added after the primary run",
+    "ladder": [
+      {
+        "model": "hvg_pca",
+        "kind": "baseline",
+        "signature": "c17_k100",
+        "resolution": 1.0,
+        "top_cell_type": "malignant cell",
+        "direction": "protective",
+        "cindex": 0.5912419990152634,
+        "ci_lo": 0.5452895171143811,
+        "ci_hi": 0.6358194608379203,
+        "floor_mean": 0.4903022679714426,
+        "above_floor": 0.1009397310438207,
+        "null_p95": 0.5939715657311669,
+        "hvg_frac": 0.11
+      },
+      {
+        "model": "scgpt",
+        "kind": "fm",
+        "signature": "c8_k50",
+        "resolution": 1.0,
+        "top_cell_type": "malignant cell",
+        "direction": "protective",
+        "cindex": 0.5829486706056131,
+        "ci_lo": 0.5261261394804863,
+        "ci_hi": 0.6310475271161332,
+        "floor_mean": 0.4923735228951256,
+        "above_floor": 0.0905751477104874,
+        "null_p95": 0.5895117860659773,
+        "hvg_frac": 0.22
+      },
+      {
+        "model": "geneformer",
+        "kind": "fm",
+        "signature": "c14_k25",
+        "resolution": 1.0,
+        "top_cell_type": "malignant cell",
+        "direction": "protective",
+        "cindex": 0.5782711718365336,
+        "ci_lo": 0.5280273265467267,
+        "ci_hi": 0.6311741858669424,
+        "floor_mean": 0.4904820593303791,
+        "above_floor": 0.0877891125061545,
+        "null_p95": 0.5899664574101428,
+        "hvg_frac": 0.04
+      }
+    ],
+    "predictions": {
+      "scgpt": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": -0.009489718593078717,
+        "P2_margin_ci": [
+          -0.04368886724804301,
+          0.021745072082440413
+        ],
+        "P2_pass": false,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.5021994134897361,
+          "Her2": 0.5369565217391304,
+          "LumA": 0.6675900277008311,
+          "LumB": 0.541430777148739
+        },
+        "P3_pass": true,
+        "P4_hvg_frac": 0.22,
+        "P4_pass": true
+      },
+      "geneformer": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": -0.012659317634914614,
+        "P2_margin_ci": [
+          -0.0764367381600232,
+          0.043675242106577805
+        ],
+        "P2_pass": false,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.5711143695014662,
+          "Her2": 0.45434782608695656,
+          "LumA": 0.492942883524601,
+          "LumB": 0.6268656716417911
+        },
+        "P3_pass": true,
+        "P4_hvg_frac": 0.04,
+        "P4_pass": true
+      }
+    }
+  },
+  "n_patients": 1094,
+  "n_events": 151
+}

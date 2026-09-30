@@ -1,7 +1,8 @@
 # Design — do foundation-model cell states stratify cancer patients better than a linear baseline?
 
 *The literature and novelty analysis live in `../research/literature.md`. This document is the
-experimental design: what is measured, against what, and in what order. Nothing here has run.*
+experimental design: what is measured, against what, and in what order. Sections 1–10 were
+written before any data were seen. Section 11 was added on 2026-09-30, after the primary run.*
 
 ## 1. The question
 
@@ -114,9 +115,9 @@ atlas; (3) name the orthogonal assay that would confirm the state in tissue.
 
 ## 9. Compute
 
-CPU-only. Light checkpoints (scGPT whole-human, Geneformer 6-layer) at batch 1; the atlas is
-subsampled to ≤50,000 cells stratified by cell type for embedding. Bulk arm is trivially cheap.
-Own venv: `UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm` (see `CLAUDE.md`).
+CPU-only. Light checkpoints (scGPT whole-human, Geneformer 6-layer V1). The atlas is subsampled
+to ≤50,000 cells stratified by cell type. Embedding runs in bfloat16 on length-sorted batches;
+setup and measured throughput are in the README. The bulk arm is cheap.
 
 ## 10. Risks
 
@@ -127,3 +128,22 @@ Own venv: `UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm` (see `CLAUDE.md`).
 - **TCGA-BRCA survival is right-censored with ~15% events.** PFI is the secondary endpoint for
   power; both reported.
 - **Atlas composition ≠ TCGA composition.** Subtype mix differs; P3 addresses this directly.
+
+## 11. Sensitivity analysis: direction of effect (added after the primary run)
+
+The pre-registered ladder reads the concordance index in one direction: a signature earns a high
+C-index only when a higher score means worse survival. The design did not say whether protective
+signatures, where a higher score means longer survival, should count. The primary run showed that
+they are common and include the largest departures from 0.5 (C down to 0.40).
+
+The sensitivity analysis reads every signature in the direction it acts on the full cohort:
+
+- a protective signature is scored as 1 − C, and each of its matched random sets is scored the
+  same way, so the floor asks whether the signature beats random genes in its own direction;
+- the family-wise null is the best max(C, 1 − C) across a representation's signatures, computed on
+  the same 500 outcome permutations as the primary null;
+- bootstrap intervals and the within-subtype test (P3) keep each signature's direction fixed.
+
+The primary ladder and predictions are unchanged and remain the pre-registered result. The
+sensitivity ladder is reported beside them and labelled as post hoc.
+

@@ -11,7 +11,14 @@ wheels/
 .venv-scfm
 
 # Saved embedding tensors, downloaded data, and results
-results/
+# results: small text outputs and figures are tracked; embeddings and shards are not
+results/*
+!results/atlas_cells.csv
+!results/run_log.json
+!results/states/
+!results/translate/
+!results/ladder/
+!results/report/
 smoke/
 data/
 cells/
