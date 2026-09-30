@@ -1,0 +1,109 @@
+[
+ {
+  "stage": "01_data",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/01_data.py"
+  ],
+  "started": 1790694058.2906084,
+  "seconds": 74.8,
+  "rc": 0,
+  "dry_run": false
+ },
+ {
+  "stage": "02_embed",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/02_embed.py"
+  ],
+  "started": 1790694842.4350262,
+  "seconds": 6261.3,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/embeddings/params.json"
+ },
+ {
+  "stage": "03_states",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/03_states.py"
+  ],
+  "started": 1790701103.7519863,
+  "seconds": 474.2,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/states/params.json"
+ },
+ {
+  "stage": "04_translate",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/04_translate.py"
+  ],
+  "started": 1790701577.966857,
+  "seconds": 497.1,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/translate/params.json"
+ },
+ {
+  "stage": "05_ladder",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/05_ladder.py"
+  ],
+  "started": 1790702075.0611145,
+  "seconds": 9.6,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/ladder/params.json"
+ },
+ {
+  "stage": "06_report",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/06_report.py"
+  ],
+  "started": 1790702084.7318068,
+  "seconds": 8.2,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/report/params.json"
+ },
+ {
+  "stage": "04_translate",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/04_translate.py"
+  ],
+  "started": 1790759211.9287114,
+  "seconds": 452.2,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/translate/params.json"
+ },
+ {
+  "stage": "05_ladder",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/05_ladder.py"
+  ],
+  "started": 1790759664.1729507,
+  "seconds": 11.9,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/ladder/params.json"
+ },
+ {
+  "stage": "06_report",
+  "cmd": [
+   "/scratch/.venv-scfm/bin/python",
+   "/data/scfm/scripts/06_report.py"
+  ],
+  "started": 1790759676.1268184,
+  "seconds": 8.2,
+  "rc": 0,
+  "dry_run": false,
+  "params": "/data/scfm/results/report/params.json"
+ }
+]

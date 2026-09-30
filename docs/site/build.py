@@ -317,32 +317,36 @@ def data_uri(p: Path):
     return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
 
 
-def result_slot(name, title, what, read):
+def result_slot(name, title, what, read, wide=False):
     p = REPORT / f"{name}.png"
     if p.exists():
         img = f'<img src="{data_uri(p)}" alt="{title}">'
+        if wide:
+            img = f'<div class="imgscroll">{img}</div>'
         state = ""
     else:
         img = (f'<div class="pending"><span class="pending-k">{name}.png</span>'
                f'<span>Result panel — fills in when stage 06 runs.</span></div>')
         state = ' data-pending="true"'
-    return (f'<figure class="result" data-slot="{name}"{state}>'
+    return (f'<figure class="result{" wide" if wide else ""}" data-slot="{name}"{state}>'
             f'<figcaption><span class="rk">{title}</span></figcaption>{img}'
             f'<div class="rtext"><p><strong>What it shows.</strong> {what}</p><p><strong>How to read it.</strong> {read}</p></div>'
             f'</figure>')
 
 
-def ladder_table():
+def ladder_table(sensitivity=False):
     rows = []
     have = LADDER.exists()
     L = json.load(open(LADDER)) if have else None
     order = ["hvg_pca", "scgpt", "geneformer"]
-    by = {r["model"]: r for r in L["ladder"]} if have else {}
+    src = (L["sensitivity"]["ladder"] if sensitivity else L["ladder"]) if have else []
+    by = {r["model"]: r for r in src}
     for m in order:
         r = by.get(m)
         sw = f'<span class="swatch" style="background:{COL[m]}"></span>'
         if r:
-            rows.append(f'<tr><td>{sw}{NAME[m]}</td><td>{r["top_cell_type"]}</td>'
+            ct = r["top_cell_type"] + (f' · {r["direction"]}' if sensitivity else "")
+            rows.append(f'<tr><td>{sw}{NAME[m]}</td><td>{ct}</td>'
                         f'<td class="num">{r["cindex"]:.3f}</td><td class="num">{r["ci_lo"]:.3f}–{r["ci_hi"]:.3f}</td>'
                         f'<td class="num">{r["floor_mean"]:.3f}</td><td class="num">{r["above_floor"]:+.3f}</td>'
                         f'<td class="num">{r["null_p95"]:.3f}</td><td class="num">{r["hvg_frac"]:.2f}</td></tr>')
@@ -358,17 +362,62 @@ def ladder_table():
             f'<p class="sub" style="margin-top:8px">{meta}. One row per representation: its best cell state, chosen by margin above its own floor, not by raw score.</p>')
 
 
-def predictions_status():
+def predictions_status(sensitivity=False):
     if not LADDER.exists():
         return ""
     L = json.load(open(LADDER))
+    P = L["sensitivity"]["predictions"] if sensitivity else L["predictions"]
     out = ['<div class="pstatus">']
-    for m, p in L["predictions"].items():
+    for m, p in P.items():
         cells = "".join(f'<span class="pill {"on" if p[k] else "off"}">{k.split("_")[0]} {"pass" if p[k] else "fail"}</span>'
                         for k in ("P1_above_floor", "P2_pass", "P3_pass", "P4_pass"))
         out.append(f'<div><span class="swatch" style="background:{COL[m]}"></span><strong>{NAME[m]}</strong> {cells}</div>')
     out.append("</div>")
     return "".join(out)
+
+
+def findings_html():
+    if not LADDER.exists():
+        return ""
+    L = json.load(open(LADDER))
+    P = L["predictions"]
+    fm = [m for m in ("scgpt", "geneformer") if m in P]
+    margins = "; ".join(f'{NAME[m]} {P[m]["P2_margin_over_baseline"]:+.3f} '
+                        f'(95% interval {P[m]["P2_margin_ci"][0]:+.3f} to {P[m]["P2_margin_ci"][1]:+.3f})'
+                        for m in fm)
+    return (f'<div class="call"><p><strong>Neither foundation model beats the linear baseline.</strong> '
+            f'In {L["n_patients"]:,} TCGA-BRCA patients with {L["n_events"]} deaths, the best '
+            f'signature of every representation stays below its permutation null, so P1 fails for both '
+            f'models. The margin over HVG-PCA is {margins}; both intervals include zero, so P2 fails. '
+            f'PAM50 subtype alone reaches C = {L["reference_pam50"]:.3f}. The sensitivity analysis below, '
+            f'which also credits protective signatures, gives the same answer.</p></div>')
+
+
+def sensitivity_html():
+    if not LADDER.exists() or not json.load(open(LADDER)).get("sensitivity"):
+        return ""
+    L = json.load(open(LADDER))
+    P = L["sensitivity"]["predictions"]
+    p3 = []
+    for m in ("scgpt", "geneformer"):
+        if m in P and P[m]["P3_pass"]:
+            st, v = max(P[m]["P3_within_subtype_cindex"].items(), key=lambda kv: kv[1])
+            p3.append(f"{NAME[m]} in {st} (C = {v:.3f})")
+    p3_txt = (" P3 passes for " + " and ".join(p3) + ". P3 is a single threshold of 0.6 applied "
+              "across four subtypes, with no null of its own, and these signatures do not pass P1; "
+              "the within-subtype values are leads for replication, not findings.") if p3 else ""
+    fig = REPORT / "fig_ladder_sensitivity.png"
+    img = f'<figure class="result narrow"><img src="{data_uri(fig)}" alt="Sensitivity ladder"></figure>' if fig.exists() else ""
+    return (f'<h2 id="sensitivity">Sensitivity analysis: protective signatures</h2>'
+            f'<p class="sub">Added after the primary run. The primary ladder is unchanged.</p>'
+            f'<p>The pre-registered concordance index credits a signature only when a higher score means '
+            f'worse survival. Many signatures work the other way: a higher score means longer survival. '
+            f'They include the largest departures from 0.5 in the run, down to C = 0.40. Here every '
+            f'signature is read in the direction it acts. Its floor is oriented the same way, and the '
+            f'permutation null takes the best of max(C, 1 − C) over the same 500 permutations.</p>'
+            f'{img}{ladder_table(sensitivity=True)}{predictions_status(sensitivity=True)}'
+            f'<p>The best state of every representation is a protective malignant-cell state, and every one '
+            f'sits just below its null. HVG-PCA is still the strongest.{p3_txt}</p>')
 
 
 # ----------------------------------------------------------------------------- page
@@ -442,6 +491,10 @@ p{{margin:0 0 14px}}
 .result figcaption{{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;padding-left:2px}}
 .result .rtext p{{font-size:12.5px;color:var(--muted);margin:8px 0 0}}
 .result .rtext strong{{color:var(--ink);font-weight:600}}
+.result.wide{{grid-column:1/-1}}
+.result.narrow{{max-width:640px;margin-bottom:14px}}
+.result.wide .imgscroll{{overflow-x:auto}}
+.result.wide .imgscroll img{{min-width:900px}}
 .pending{{aspect-ratio:2/1;border:1.5px dashed var(--axis);border-radius:3px;background:repeating-linear-gradient(135deg,transparent 0 10px,#F2F4F5 10px 20px);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:12.5px;text-align:center;padding:12px}}
 .pending-k{{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink)}}
@@ -492,7 +545,7 @@ def panel(fig_html, caption):
 def build():
     today = date.today().isoformat()
     have_results = LADDER.exists()
-    status = "results in" if have_results else "design complete · results pending"
+    status = "results in · negative" if have_results else "design complete · results pending"
 
     arms = [
         ("hvg_pca", "The baseline: no learning",
@@ -560,17 +613,17 @@ def build():
 
     results_html = "".join([
         result_slot("fig_ladder", "A · the ladder",
-                    "One bar per representation: the concordance index of its best cell-state signature, with a 95% interval from resampling patients. Dotted tick: that signature's matched-random floor. Dashed line: PAM50.",
-                    "Bars that clear their dotted tick pass P1. The distance between the scGPT / Geneformer bars and the HVG-PCA bar is the study's result."),
+                    "One bar per representation: the concordance index of its best cell-state signature, with a 95% interval from resampling patients. Dotted tick: that signature's matched-random floor. Thick tick: the 95th percentile of the permutation null for the best of that representation's signatures. Dashed line: PAM50.",
+                    "A bar that clears both ticks passes P1. The distance between the scGPT / Geneformer bars and the HVG-PCA bar is the study's result."),
         result_slot("fig_margin", "B · the margin over the baseline",
                     "For each foundation model, the difference in concordance from the HVG-PCA baseline, computed on the same 200 patient resamples so the comparison is paired.",
                     "An interval wholly to the right of zero passes P2. An interval straddling zero is the sceptics' result, and is reported as such."),
-        result_slot("fig_km", "C · survival curves, overall and within subtype",
-                    "Kaplan–Meier curves for patients split into thirds by the best foundation-model signature: all patients, then each PAM50 subtype with enough events.",
-                    "Separated curves inside a single subtype panel is P3: the state orders patients that PAM50 puts in one box. Curves that separate only in the all-patients panel mean the state is tracking subtype."),
-        result_slot("fig_hvg", "D · where the informative genes come from",
+        result_slot("fig_hvg", "C · where the informative genes come from",
                     "Every signature from every representation: the fraction of its genes that are HVGs (x) against its concordance above the matched-random floor (y).",
                     "Foundation-model points high on the y-axis and left of 0.5 on the x-axis are P4: prognostic signal built from genes the baseline never saw."),
+        result_slot("fig_km", "D · survival curves, overall and within subtype",
+                    "Kaplan–Meier curves for patients split into thirds by the best foundation-model signature: all patients, then each PAM50 subtype with enough events.",
+                    "Separated curves inside a single subtype panel is P3: the state orders patients that PAM50 puts in one box. Curves that separate only in the all-patients panel mean the state is tracking subtype. Thirds are cut on all patients, so a small subtype can lack one of them.", wide=True),
     ])
 
     refs = [
@@ -592,7 +645,8 @@ def build():
 
     nav = "".join(f'<li><a href="#{a}">{t}</a></li>' for a, t in [
         ("question", "Question"), ("compared", "What is compared"), ("design", "Design"), ("ladder", "Ladder"),
-        ("predictions", "Predictions"), ("results", "Results"), ("conventions", "Conventions"),
+        ("predictions", "Predictions"), ("results", "Results"), ("sensitivity", "Sensitivity"),
+        ("conventions", "Conventions"),
         ("outcomes", "Outcomes"), ("validation", "Validation"), ("limits", "Limits"), ("refs", "References")])
 
     html = f"""<title>Cell states versus survival</title>
@@ -638,10 +692,12 @@ def build():
 {predictions_status()}
 
 <h2 id="results">Results</h2>
-<p class="sub">{"The four panels stage 06 writes, and the ladder table." if have_results else "The full run is in progress. The four panels below are the ones stage 06 will write, each with what it will show and how to read it; the table has the shape of the final ladder. When the data land, this section fills in and nothing else on the page changes."}</p>
+{findings_html()}
+<p class="sub">{"The four panels stage 06 writes, and the ladder table. Everything in this block is the pre-registered analysis." if have_results else "The full run is in progress. The four panels below are the ones stage 06 will write, each with what it will show and how to read it; the table has the shape of the final ladder. When the data land, this section fills in and nothing else on the page changes."}</p>
 <div class="results">{results_html}</div>
 <h3>The ladder as a table</h3>
 {ladder_table()}
+{sensitivity_html()}
 
 <h2 id="conventions">Statistical conventions</h2>
 <p class="sub">Each of these was learned the hard way on an earlier study and is fixed here before any data are seen.</p>

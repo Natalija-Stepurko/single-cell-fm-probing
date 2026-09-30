@@ -58,7 +58,7 @@ def build_atlas(out: Path, max_cells: int, seed: int):
         print(f"  downloading counts for {len(coords):,} cells …", flush=True)
         adata = cellxgene_census.get_anndata(
             census, organism=C.CENSUS_ORGANISM, obs_coords=coords,
-            obs_column_names=[c for c in C.CENSUS_OBS_COLUMNS if c != "soma_joinid"],
+            obs_column_names=C.CENSUS_OBS_COLUMNS,
             var_column_names=["feature_id", "feature_name"])
     adata.obs_names = adata.obs_names.astype(str)
     adata.var["ensembl_id"] = adata.var["feature_id"].astype(str).values
@@ -88,6 +88,13 @@ def build_atlas(out: Path, max_cells: int, seed: int):
           f"{int(adata.var['highly_variable'].sum())} HVGs; "
           f"{adata.obs['donor_id'].nunique()} donors", flush=True)
     adata.write_h5ad(out / "atlas.h5ad")
+    # the cell list plus the pinned Census release rebuilds this exact atlas
+    C.RESULTS.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"obs_name": adata.obs_names, "soma_joinid": adata.obs["soma_joinid"].values,
+                  "cell_type": adata.obs["cell_type"].astype(str).values,
+                  "donor_id": adata.obs["donor_id"].astype(str).values,
+                  "dataset_id": adata.obs["dataset_id"].astype(str).values}
+                 ).to_csv(C.RESULTS / "atlas_cells.csv", index=False)
     return adata
 
 

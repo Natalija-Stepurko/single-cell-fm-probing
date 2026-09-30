@@ -26,8 +26,11 @@ Literature and novelty: `research/literature.md`.
 
 ## Status
 
-Design complete. The pipeline passed an end-to-end smoke test on 2,000 cells on 2026-09-29, and
-the full 50,000-cell run started the same day. Results are not yet in this repository.
+The full run on 50,002 cells and 1,094 patients completed on 2026-09-29. The result is negative:
+neither foundation model's cell states predict survival better than the HVG-PCA baseline, and no
+representation's best signature clears its family-wise permutation null. A post-hoc sensitivity
+analysis that also credits protective signatures gives the same answer. Numbers and figures are
+on the project page; the tables behind them are in `results/`.
 
 ## Pipeline
 
@@ -115,9 +118,11 @@ The two cohorts share no patients. Data and results are git-ignored.
 ```
 docs/DESIGN.md        the design: question, ladder, predictions, stages, conventions
 docs/index.html       the project page (GitHub Pages); rebuilt by docs/site/build.py
+results/              tracked: cell list, signatures, scores, nulls, ladder, report figures, params
+                      and run log (5 MB); embeddings and shards stay local
 research/             literature and novelty notes
 scripts/              01–06 stages, run.py orchestrator, config.py, qc_common.py, surv_common.py
-data/  results/       git-ignored
+data/  smoke/        git-ignored
 ```
 
 ## Licence

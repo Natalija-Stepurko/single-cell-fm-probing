@@ -99,9 +99,57 @@ def main():
         P[m]["P3_within_subtype_cindex"] = p3
         P[m]["P3_pass"] = bool(any(v > 0.6 for v in p3.values()))
 
+    # ── sensitivity analysis: each signature read in the direction it acts ──────────────
+    # added after the primary run; everything above is the pre-registered ladder, unchanged
+    sens_ladder, P_or = None, {}
+    if "above_floor_or" in scores.columns:
+        best_or = (scores.dropna(subset=["above_floor_or"])
+                   .sort_values("above_floor_or", ascending=False)
+                   .groupby("model", as_index=False).head(1).set_index("model"))
+        orient = lambda c, d: c if d == 1 else 1 - c      # direction fixed on the full cohort
+        rng_or = np.random.default_rng(args.seed + 1)
+        boot_or = {m: [] for m in best_or.index}
+        for bs in bootstrap_patients(clin, args.n_boot, rng_or):
+            for m, r in best_or.iterrows():
+                boot_or[m].append(orient(cindex(bs.assign(score=score_signature(zexpr, genes_of(r))),
+                                                tm, ev, "score"), r["direction"]))
+        boot_or = {m: np.array(v) for m, v in boot_or.items()}
+        rows_or = []
+        for m, r in best_or.iterrows():
+            rows_or.append({"model": m, "kind": r["kind"], "signature": r["signature"],
+                            "resolution": r["resolution"], "top_cell_type": r["top_cell_type"],
+                            "direction": "risk" if r["direction"] == 1 else "protective",
+                            "cindex": r["cindex_or"], "ci_lo": lo(boot_or[m]), "ci_hi": hi(boot_or[m]),
+                            "floor_mean": r["floor_or_mean"], "above_floor": r["above_floor_or"],
+                            "null_p95": meta["nulls"][m]["best_oriented_null_p95"],
+                            "hvg_frac": r["hvg_frac"]})
+        sens_ladder = pd.DataFrame(rows_or).set_index("model")
+        for m in [x for x in sens_ladder.index if sens_ladder.loc[x, "kind"] == "fm"]:
+            margin = boot_or[m] - boot_or[base]
+            p3 = {}
+            for st, sub in clin.dropna(subset=["subtype"]).groupby("subtype"):
+                if sub[ev].sum() >= 10:
+                    p3[st] = orient(cindex(sub.assign(score=score_signature(zexpr, genes_of(best_or.loc[m]))),
+                                           tm, ev, "score"), best_or.loc[m, "direction"])
+            P_or[m] = {
+                "P1_above_floor": bool(sens_ladder.loc[m, "above_floor"] > 0
+                                       and sens_ladder.loc[m, "cindex"] > sens_ladder.loc[m, "null_p95"]),
+                "P2_margin_over_baseline": float(np.nanmean(margin)),
+                "P2_margin_ci": [lo(margin), hi(margin)],
+                "P2_pass": bool(lo(margin) > 0),
+                "P3_within_subtype_cindex": p3,
+                "P3_pass": bool(any(v > 0.6 for v in p3.values())),
+                "P4_hvg_frac": float(sens_ladder.loc[m, "hvg_frac"]),
+                "P4_pass": bool(sens_ladder.loc[m, "hvg_frac"] < 0.5),
+            }
+        sens_ladder.to_csv(out / "ladder_sensitivity.csv")
+
     ladder.to_csv(out / "ladder.csv")
     json.dump({"ladder": ladder.reset_index().to_dict("records"), "reference_pam50": ref,
                "predictions": P, "endpoint": meta["endpoint"],
+               "sensitivity": None if sens_ladder is None else {
+                   "note": "each signature read in the direction it acts; added after the primary run",
+                   "ladder": sens_ladder.reset_index().to_dict("records"), "predictions": P_or},
                "n_patients": meta["n_patients"], "n_events": meta["n_events"]},
               open(out / "ladder.json", "w"), indent=2, default=float)
 
@@ -117,6 +165,17 @@ def main():
                      f"(margin {p['P2_margin_over_baseline']:+.3f} "
                      f"[{p['P2_margin_ci'][0]:+.3f},{p['P2_margin_ci'][1]:+.3f}]) "
                      f"P3={p['P3_pass']} P4={p['P4_pass']}")
+    if sens_ladder is not None:
+        lines += ["", "Sensitivity — each signature read in the direction it acts (added after the primary run)"]
+        for m, r in sens_ladder.iterrows():
+            lines.append(f"  {m:<11} C={r['cindex']:.3f} [{r['ci_lo']:.3f},{r['ci_hi']:.3f}]  "
+                         f"floor={r['floor_mean']:.3f}  null95={r['null_p95']:.3f}  "
+                         f"hvg={r['hvg_frac']:.2f}  {r['direction']}  {r['top_cell_type']}")
+        for m, p in P_or.items():
+            lines.append(f"  {m}: P1={p['P1_above_floor']} P2={p['P2_pass']} "
+                         f"(margin {p['P2_margin_over_baseline']:+.3f} "
+                         f"[{p['P2_margin_ci'][0]:+.3f},{p['P2_margin_ci'][1]:+.3f}]) "
+                         f"P3={p['P3_pass']} P4={p['P4_pass']}")
     (out / "summary.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     qc.record_params(out, args, extra={"predictions": P})

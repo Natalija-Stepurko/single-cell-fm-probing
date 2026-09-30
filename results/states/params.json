@@ -1,0 +1,65 @@
+{
+  "script": "03_states.py",
+  "timestamp_utc": "2026-09-29T17:06:17+00:00",
+  "command": "/data/scfm/scripts/03_states.py",
+  "args": {
+    "data_dir": "/data/scfm/data",
+    "emb_dir": "/data/scfm/results/embeddings",
+    "out_dir": "/data/scfm/results/states",
+    "models": [
+      "hvg_pca",
+      "scgpt",
+      "geneformer"
+    ],
+    "resolutions": [
+      0.3,
+      0.5,
+      1.0
+    ],
+    "topk": [
+      25,
+      50,
+      100
+    ],
+    "min_cells": 200,
+    "seed": 42,
+    "dry_run": false
+  },
+  "git_commit": "fa3449bfe9c72e917cbbdeed38a3774715b87821",
+  "git_dirty": false,
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "torch": "2.14.0+cu130",
+    "xgboost": "3.4.1",
+    "umap": "0.5.12"
+  },
+  "extra": {
+    "hvg_pca": {
+      "n_signatures": 369,
+      "n_states": {
+        "0.3": 31,
+        "0.5": 42,
+        "1.0": 50
+      }
+    },
+    "scgpt": {
+      "n_signatures": 201,
+      "n_states": {
+        "0.3": 17,
+        "0.5": 18,
+        "1.0": 32
+      }
+    },
+    "geneformer": {
+      "n_signatures": 213,
+      "n_states": {
+        "0.3": 16,
+        "0.5": 22,
+        "1.0": 33
+      }
+    }
+  }
+}

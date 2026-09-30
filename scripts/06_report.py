@@ -26,10 +26,11 @@ from surv_common import score_signature, zscore_genes
 COL = {"hvg_pca": "#4A4F55", "scgpt": "#1F6F6B", "geneformer": "#C2681A"}
 
 
-def fig_ladder(ladder, ref, out):
+def fig_ladder(ladder, ref, out, name="fig_ladder",
+               title="Best signature per representation, risk direction (pre-registered)"):
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(7.2, 3.6))
+    fig, ax = plt.subplots(figsize=(7.2, 3.9))
     y = np.arange(len(ladder))
     for i, (m, r) in enumerate(ladder.iterrows()):
         ax.barh(i, r["cindex"] - 0.5, left=0.5, color=COL.get(m, "#888"), height=0.55)
@@ -37,15 +38,17 @@ def fig_ladder(ladder, ref, out):
         ax.text(r["ci_hi"] + 0.005, i, f"{r['cindex']:.3f}", va="center", fontsize=9,
                 family="monospace")
         ax.plot([r["floor_mean"]] * 2, [i - .3, i + .3], color="#888", lw=1, ls=":")
+        ax.plot([r["null_p95"]] * 2, [i - .36, i + .36], color="#16191D", lw=2)
     ax.axvline(0.5, color="#B9C0C6", lw=1)
     if np.isfinite(ref):
         ax.axvline(ref, color="#16191D", lw=1, ls="--"); ax.text(ref, len(y) - .75, "PAM50 ", fontsize=8,
                                                                  ha="right", va="center")
     ax.set_yticks(y); ax.set_yticklabels(ladder.index); ax.set_xlabel("concordance index")
-    ax.set_title("Best signature per representation — patient bootstrap 95%; dotted = matched-random floor",
-                 fontsize=9, loc="left")
+    ax.set_title(title + "\nbar = C-index · line = patient bootstrap 95%\n"
+                 "dotted = matched-random floor · thick tick = permutation null, 95th percentile",
+                 fontsize=8, loc="left")
     for s in ("top", "right"): ax.spines[s].set_visible(False)
-    fig.tight_layout(); fig.savefig(out / "fig_ladder.png", dpi=150); plt.close(fig)
+    fig.tight_layout(); fig.savefig(out / f"{name}.png", dpi=150); plt.close(fig)
 
 
 def fig_margin(P, out):
@@ -126,6 +129,10 @@ def main():
     ev, tm = C.ENDPOINTS[L["endpoint"]]
 
     fig_ladder(ladder, L["reference_pam50"], out)
+    if L.get("sensitivity"):
+        fig_ladder(pd.DataFrame(L["sensitivity"]["ladder"]).set_index("model"), L["reference_pam50"],
+                   out, name="fig_ladder_sensitivity",
+                   title="Sensitivity: best signature per representation, read in the direction it acts")
     fig_margin(L["predictions"], out)
     fig_hvg(scores, out)
     fm = [m for m in ladder.index if ladder.loc[m, "kind"] == "fm"]
