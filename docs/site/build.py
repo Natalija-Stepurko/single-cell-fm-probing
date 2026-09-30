@@ -8,6 +8,7 @@ contain and how to read it. Re-run after stage 06 to fill the page; nothing else
     python3 docs/site/build.py                -> docs/index.html (served by GitHub Pages)
 """
 import base64
+from urllib.parse import quote
 import json
 import sys
 from datetime import date
@@ -421,6 +422,36 @@ def sensitivity_html():
 
 
 # ----------------------------------------------------------------------------- page
+# the ladder chart in miniature: three bars in the view colours and the null tick
+FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">'
+           '<rect width="32" height="32" rx="6" fill="#16191D"/>'
+           '<rect x="6" y="7" width="15" height="4.5" rx="1" fill="#C9CED3"/>'
+           '<rect x="6" y="14" width="18" height="4.5" rx="1" fill="#2FA39B"/>'
+           '<rect x="6" y="21" width="13" height="4.5" rx="1" fill="#E08A3C"/>'
+           '<rect x="24.5" y="5" width="2" height="22" rx="1" fill="#FFFFFF"/></svg>')
+
+NAV_JS = """
+(()=>{
+  const nav=document.querySelector('.topnav'), btn=nav.querySelector('.navtoggle');
+  const links=[...nav.querySelectorAll('ul a')];
+  const byId=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const setOpen=o=>{nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',String(o));};
+  btn.addEventListener('click',()=>setOpen(!nav.classList.contains('open')));
+  links.forEach(a=>a.addEventListener('click',()=>setOpen(false)));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
+  document.addEventListener('click',e=>{if(!nav.contains(e.target))setOpen(false);});
+  const heads=[...byId.keys()].map(id=>document.getElementById(id)).filter(Boolean);
+  const mark=()=>{
+    const y=nav.offsetHeight+24; let cur=null;
+    for(const h of heads){ if(h.getBoundingClientRect().top<=y) cur=h; else break; }
+    links.forEach(a=>{a.classList.remove('active');a.removeAttribute('aria-current');});
+    if(cur){const a=byId.get(cur.id);a.classList.add('active');a.setAttribute('aria-current','true');
+      btn.textContent=a.textContent;} else btn.textContent='Sections';
+  };
+  addEventListener('scroll',mark,{passive:true}); addEventListener('resize',mark); mark();
+})();
+"""
+
 CSS = f"""
 :root{{
   --paper:#F7F8F9; --panel:#FFFFFF; --ink:{INK}; --muted:{MUTED}; --rule:{RULE}; --axis:{AXIS};
@@ -430,15 +461,31 @@ CSS = f"""
 body{{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;
   -webkit-font-smoothing:antialiased;padding-inline:16px}}
 .wrap{{max-width:1140px;margin:0 auto;padding:34px 0 96px}}
-.topnav{{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 88%,transparent);
+html{{scroll-behavior:smooth}}
+h2[id]{{scroll-margin-top:74px}}
+.topnav{{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 90%,transparent);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);margin-inline:-16px;padding-inline:16px}}
-.topnav .inner{{max-width:1140px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:54px}}
-.topnav .brand{{font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap}}
-.topnav ul{{list-style:none;margin:0;padding:0;display:flex;gap:18px;font-family:var(--mono);font-size:11px;
-  letter-spacing:.06em;text-transform:uppercase;overflow-x:auto;scrollbar-width:none}}
-.topnav ul::-webkit-scrollbar{{display:none}}
-.topnav a{{color:var(--muted);text-decoration:none;white-space:nowrap}}
-.topnav a:hover,.topnav a:focus-visible{{color:var(--ink)}}
+.topnav .inner{{max-width:1140px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;height:54px;position:relative}}
+.topnav .brand{{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap;text-decoration:none}}
+.topnav .brand svg{{width:18px;height:18px;flex:none}}
+.topnav ul{{list-style:none;margin:0;padding:0;display:flex;gap:15px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase}}
+.topnav ul a{{display:block;color:var(--muted);text-decoration:none;white-space:nowrap;padding:17px 0 15px;border-bottom:2px solid transparent}}
+.topnav ul a:hover{{color:var(--ink)}}
+.topnav ul a.active{{color:var(--ink);border-bottom-color:var(--ink)}}
+.navtoggle{{display:none;font:inherit;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px 10px;cursor:pointer;
+  max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.navtoggle::before{{content:"\\2261\\00a0\\00a0";font-size:13px}}
+.navtoggle:focus-visible{{outline:2px solid var(--scgpt);outline-offset:2px}}
+@media (max-width:1180px){{
+  .navtoggle{{display:block}}
+  .topnav ul{{display:none;position:absolute;top:54px;right:0;flex-direction:column;gap:0;min-width:220px;
+    background:var(--panel);border:1px solid var(--rule);border-radius:3px;box-shadow:0 8px 24px rgba(22,25,29,.12);padding:6px 0}}
+  .topnav.open ul{{display:flex}}
+  .topnav ul a{{padding:9px 16px;border-bottom:0;border-left:2px solid transparent}}
+  .topnav ul a.active{{border-left-color:var(--ink);background:var(--band)}}
+}}
 header{{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:34px}}
 .eyebrow{{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;
   display:flex;gap:14px;flex-wrap:wrap;align-items:center}}
@@ -644,15 +691,20 @@ def build():
     refs_html = "".join(f'<li>{t} <a href="{u}">{u.replace("https://", "")}</a></li>' for t, u in refs)
 
     nav = "".join(f'<li><a href="#{a}">{t}</a></li>' for a, t in [
-        ("question", "Question"), ("compared", "What is compared"), ("design", "Design"), ("ladder", "Ladder"),
+        ("question", "Question"), ("compared", "Compared"), ("design", "Design"), ("ladder", "Ladder"),
         ("predictions", "Predictions"), ("results", "Results"), ("sensitivity", "Sensitivity"),
         ("conventions", "Conventions"),
         ("outcomes", "Outcomes"), ("validation", "Validation"), ("limits", "Limits"), ("refs", "References")])
 
     html = f"""<title>Cell states versus survival</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(FAVICON)}">
 <style>{CSS}</style>
-<nav class="topnav"><div class="inner"><span class="brand">cell states → survival</span><ul>{nav}</ul></div></nav>
+<nav class="topnav" aria-label="Sections"><div class="inner">
+<a class="brand" href="#top">{FAVICON}<span>cell states → survival</span></a>
+<button class="navtoggle" type="button" aria-label="Jump to section" aria-expanded="false" aria-controls="navlist">Sections</button>
+<ul id="navlist">{nav}</ul></div></nav>
+<span id="top"></span>
 <div class="wrap">
 <header>
 <p class="eyebrow"><span>Single-cell foundation models · breast cancer · pre-registered design</span><span class="status">{status}</span></p>
@@ -746,6 +798,7 @@ def build():
 <div>Page built {today}. {"Results embedded." if have_results else "No results embedded."}</div>
 </footer>
 </div>
+<script>{NAV_JS}</script>
 """
     # head and body tags are optional in HTML; the page stays one self-contained file
     OUT.write_text('<!doctype html>\n<html lang="en">\n<meta charset="utf-8">\n'
