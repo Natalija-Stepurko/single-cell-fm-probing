@@ -20,8 +20,8 @@ STAGES = [
     ("data",      "assemble the single-cell atlas and the bulk cohort; harmonise genes"),
     ("embed",     "one embedding per cell for hvg_pca, scgpt, geneformer"),
     ("states",    "Leiden clusters per representation -> marker-gene signatures"),
-    ("translate", "score signatures in bulk; Cox; permutation null; matched-random floor"),
-    ("ladder",    "assemble the ladder; patient bootstraps; test P1-P4"),
+    ("translate", "score signatures in bulk; Cox; permutation null; matched-random floor; references"),
+    ("ladder",    "assemble the ladder; patient bootstraps; test P1-P4, as coded and corrected"),
     ("report",    "figures, candidate shortlist, validation template"),
 ]
 SRC = Path(__file__).resolve().parents[1]
@@ -57,11 +57,12 @@ def run_stage(name: str, extra_args: list[str], dry: bool) -> int:
     args = [relpath(a) for a in extra_args]
     rec = {"stage": name, "cmd": ["python", "-m", module] + args,
            "started": t0, "seconds": round(time.time() - t0, 1), "rc": rc, "dry_run": False}
-    # the params.json the stage wrote, if any, so the log points at its provenance
-    if C.RESULTS.exists():
-        for p in sorted(C.RESULTS.rglob("params.json"), key=os.path.getmtime, reverse=True)[:1]:
-            if os.path.getmtime(p) >= t0:
-                rec["params"] = relpath(str(p))
+    # the params.json the stage wrote, if any (the data stage writes into data/), so the log
+    # points at its provenance
+    found = [p for d in (C.RESULTS, C.DATA) if d.exists() for p in d.rglob("params.json")]
+    for p in sorted(found, key=os.path.getmtime, reverse=True)[:1]:
+        if os.path.getmtime(p) >= t0:
+            rec["params"] = relpath(str(p))
     log_append(rec)
     return rc
 

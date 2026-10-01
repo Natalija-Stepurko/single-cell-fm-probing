@@ -68,8 +68,9 @@ def record_params(out_dir, args=None, extra=None, filename="params.json") -> dic
     """Write `params.json` beside a stage's outputs.
 
     Captures the resolved argument namespace, the command line, the git commit (flagged dirty if
-    the tree has uncommitted changes), the versions of libraries whose numerics affect results,
-    the pinned model revisions and a UTC timestamp. Paths under ROOT are written relative to it.
+    the tree outside results/ has uncommitted changes), the versions of libraries whose numerics
+    affect results, the pinned model revisions and a UTC timestamp. Paths under ROOT are written
+    relative to it.
 
     Args:
         out_dir:  directory the stage writes into; created if absent.
@@ -94,7 +95,9 @@ def record_params(out_dir, args=None, extra=None, filename="params.json") -> dic
         "command": " ".join(_jsonable(list(sys.argv))),
         "args": {k: _jsonable(v) for k, v in vars(args).items()} if args is not None else {},
         "git_commit": _git("rev-parse", "HEAD", default="unknown"),
-        "git_dirty": bool(_git("status", "--porcelain", default="")),
+        # results/ is excluded: stages rewrite it, so it would always read dirty mid-run
+        "git_dirty": bool(_git("status", "--porcelain", "--", ":(top)", ":(top,exclude)results",
+                               default="")),
         "versions": versions,
         "model_revisions": {m: s["revision"] for m, s in C.MODELS.items() if "revision" in s},
     }

@@ -10,13 +10,20 @@ that make those numbers readable:
   floor  matched random gene sets — same size, same mean-expression profile — so a signature is
          credited only for what its *particular* genes add over any genes of that shape
 
-Plus the reference rung: the PAM50 subtype call's own C-index in the same cohort.
+Plus the reference rung, on one complete-case set (age, stage, PAM50 call, outcome): Cox models of
+clinical covariates, PAM50 subtype, and both, each in sample and cross-validated; age + stage on
+every patient with both (the base model for the added-value analysis); and a published
+signature, the PAM50 11-gene proliferation score, scored like any signature with its own floor and
+permutation p. The pre-registered rung (in-sample Cox of subtype + age + stage) is kept as
+`pam50_cindex`.
 
 Sensitivity analysis (added after the primary run; the primary ladder is unchanged): the
 pre-registered C-index credits a signature only when a higher score means worse survival.
 The *_or columns read each signature in the direction it acts, with a floor oriented the same
 way and a family-wise null over max(C, 1 - C) built from the same permutations.
-Output: results/translate/scores.csv, nulls.json, params.json.
+Output: results/translate/scores.csv, nulls.json (with the per-permutation family maxima),
+params.json, and null_matrix_<model>.npz (permutation × signature C, not tracked). A non-primary
+endpoint writes to results/translate_<endpoint>.
 """
 import argparse
 import json
@@ -27,6 +34,7 @@ import pandas as pd
 
 from scfm import config as C
 from scfm.provenance import record_params
+from scfm.stats import cv_cox_cindex, cv_folds, fw_pvalue, insample_cindex
 from scfm.survival import cindex, fit_cox, matched_random_sets, score_signature, zscore_genes
 
 
@@ -67,14 +75,13 @@ def _floor_chunk(Z, T, E, sigs_ix):
 
 
 def _null_chunk(S, T, E, seeds):
-    """Per permutation seed, over all rows of S against permuted outcomes: the best C-index
-    (primary, risk direction) and the best max(C, 1 - C) (sensitivity, either direction)."""
-    best = []
+    """Per permutation seed, the C-index of every row of S against permuted outcomes; the family
+    maxima (best C; best max(C, 1 - C)) are read from these rows."""
+    out = []
     for sd in seeds:
         p = np.random.default_rng(int(sd)).permutation(len(T))
-        c = np.array([_ci(T[p], E[p], S[j]) for j in range(len(S))])
-        best.append((float(c.max()), float(np.maximum(c, 1 - c).max())))
-    return best
+        out.append(np.array([_ci(T[p], E[p], S[j]) for j in range(len(S))]))
+    return out
 
 
 def _oriented(ci0, floor):
@@ -93,17 +100,93 @@ def _oriented(ci0, floor):
             "above_floor_or": c - float(np.mean(f)) if f else np.nan}
 
 
+def endpoint_dir(stage: str, endpoint: str) -> str:
+    """Output directory name: the primary endpoint keeps the plain name, others get a suffix."""
+    return stage if endpoint == C.PRIMARY_ENDPOINT else f"{stage}_{endpoint.lower()}"
+
+
+def subtype_dummies(d: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    dm = pd.get_dummies(d["subtype"], prefix="subtype", drop_first=True, dtype=float)
+    return pd.concat([d, dm], axis=1), list(dm.columns)
+
+
+def clinical_references(clin, ev, tm, endpoint) -> dict:
+    """Named Cox references: in-sample C and cross-validated C (repeated event-stratified K-fold,
+    pooled out-of-fold linear predictor, Harrell's C per repeat)."""
+    sref = clin.dropna(subset=["age", "stage_ord", "subtype", ev, tm])
+    sref, dummies = subtype_dummies(sref)
+    sets = {"clinical": C.COVARIATES, "pam50": dummies, "pam50_clinical": dummies + C.COVARIATES}
+    rng = np.random.default_rng(C.SEED_REF_CV)
+    folds = cv_folds(sref[ev], C.N_CV_SPLITS, C.N_CV_REPEATS, rng)
+    cv = cv_cox_cindex(sref, tm, ev, sets, folds)
+    full = clin.dropna(subset=C.COVARIATES + [ev, tm])
+    cv_full = cv_cox_cindex(full, tm, ev, {"clinical_full": C.COVARIATES},
+                            cv_folds(full[ev], C.N_CV_SPLITS, C.N_CV_REPEATS, rng))
+    out = {}
+    for name, cols, d, cvs in [(k, v, sref, cv[k]) for k, v in sets.items()] + [
+            ("clinical_full", C.COVARIATES, full, cv_full["clinical_full"])]:
+        out[name] = {"covariates": cols, "n": len(d), "events": int(d[ev].sum()),
+                     "cindex_in_sample": insample_cindex(d, tm, ev, cols),
+                     "cindex_cv_mean": float(cvs.mean()), "cindex_cv_sd": float(cvs.std(ddof=1)),
+                     "cindex_cv_repeats": cvs.tolist(),
+                     "cv": f"{C.N_CV_REPEATS} x {C.N_CV_SPLITS}-fold, stratified by event, "
+                           f"seed {C.SEED_REF_CV}"}
+        print(f"  reference {name}: n={len(d)}, in-sample C = {out[name]['cindex_in_sample']:.3f}, "
+              f"CV C = {out[name]['cindex_cv_mean']:.3f} ± {out[name]['cindex_cv_sd']:.3f}", flush=True)
+    return out
+
+
+def resolve_proliferation(symbols) -> dict[str, str]:
+    """Published symbol -> symbol present in bulk (the published one, else its first present alias)."""
+    have = set(symbols)
+    out = {}
+    for g, aliases in C.PROLIFERATION_GENES.items():
+        hit = next((a for a in [g] + aliases if a in have), None)
+        if hit is not None:
+            out[g] = hit
+    return out
+
+
+def proliferation_reference(clin, zexpr, gene_mean, T, E, ok, ev, tm, n_floor, n_perm) -> dict:
+    used = resolve_proliferation(zexpr.index)
+    genes = list(used.values())
+    ci0, hr, p = score_one(zexpr, clin, genes, ev, tm)
+    gidx = {g: i for i, g in enumerate(zexpr.index)}
+    Zok = zexpr.to_numpy(dtype=np.float64)[:, ok]
+    rng_f = np.random.default_rng(C.SEED_REF_FLOOR)
+    sets = matched_random_sets(genes, gene_mean, n_floor, C.EXPRESSION_BINS, rng_f)
+    floor = [v for v in _floor_chunk(Zok, T, E, [[[gidx[g] for g in gs] for gs in sets]])[0]]
+    sc = _scores(Zok, [gidx[g] for g in genes])
+    rng_p = np.random.default_rng(C.SEED_REF_PERM)
+    null = [_ci(T[q], E[q], sc) for q in (rng_p.permutation(len(T)) for _ in range(n_perm))]
+    o = _oriented(ci0, floor)
+    out = {"name": "PAM50 11-gene proliferation score (Nielsen et al. 2010; ROR-P)",
+           "genes_published": list(C.PROLIFERATION_GENES), "genes_used": used,
+           "n_genes": len(genes), "n": int(ok.sum()), "events": int(E.sum()),
+           "cindex": ci0, "hr_adjusted": hr, "p_adjusted": p,
+           "floor_mean": float(np.mean(floor)), "floor_p95": float(np.percentile(floor, 95)),
+           "above_floor": ci0 - float(np.mean(floor)), "n_floor": n_floor,
+           "perm_p": fw_pvalue(ci0, null), "n_perm": n_perm,
+           "seeds": {"floor": C.SEED_REF_FLOOR, "perm": C.SEED_REF_PERM}, **o}
+    print(f"  reference proliferation: C = {ci0:.3f}, floor {out['floor_mean']:.3f}, "
+          f"perm p = {out['perm_p']:.3g}", flush=True)
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default=str(C.DATA))
     ap.add_argument("--states-dir", default=str(C.RESULTS / "states"))
-    ap.add_argument("--out-dir", default=str(C.RESULTS / "translate"))
+    ap.add_argument("--out-dir", default=None,
+                    help="default results/translate, or results/translate_<endpoint> off the primary one")
     ap.add_argument("--endpoint", default=C.PRIMARY_ENDPOINT, choices=list(C.ENDPOINTS))
     ap.add_argument("--n-perm", type=int, default=C.N_PERMUTATIONS)
     ap.add_argument("--n-floor", type=int, default=C.N_FLOOR_SETS)
     ap.add_argument("--seed", type=int, default=C.SEED)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
+    if args.out_dir is None:
+        args.out_dir = str(C.RESULTS / endpoint_dir("translate", args.endpoint))
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     ev, tm = C.ENDPOINTS[args.endpoint]
 
@@ -141,12 +224,13 @@ def main(argv=None):
         floors = [f for chunk in par(delayed(_floor_chunk)(Zok, T, E, [ix_sets[i] for i in part])
                                      for part in parts)
                   for f in chunk]
-        scored = []
+        scored, keys = [], []
         for (res, sid, s), floor in zip(flat, floors):
             ci0, hr, p = score_one(zexpr, clin, s["genes"], ev, tm)
             sc = scores_of(s["genes"])
             if sc is not None:
                 scored.append(sc)
+                keys.append(f"{res}/{sid}")
             rows.append({"model": model, "kind": C.MODELS[model]["kind"], "resolution": res,
                          "signature": sid, "topk": s["topk"], "n_cells": s["n_cells"],
                          "top_cell_type": s["top_cell_type"], "hvg_frac": s["hvg_frac"],
@@ -159,14 +243,17 @@ def main(argv=None):
         # family-wise null: best C-index across this model's signatures per permutation
         S = np.vstack(scored)
         seeds = rng.integers(1 << 62, size=args.n_perm)
-        best = [v for chunk in par(delayed(_null_chunk)(S, T, E, c)
-                                   for c in np.array_split(seeds, C.N_JOBS)) for v in chunk]
-        best, best_or = [b for b, _ in best], [b for _, b in best]
+        cmat = np.vstack([v for chunk in par(delayed(_null_chunk)(S, T, E, c)
+                                             for c in np.array_split(seeds, C.N_JOBS)) for v in chunk])
+        best = [float(c.max()) for c in cmat]
+        best_or = [float(np.maximum(c, 1 - c).max()) for c in cmat]
+        np.savez_compressed(out / f"null_matrix_{model}.npz", cindex=cmat, signatures=np.array(keys))
         nulls[model] = {"best_cindex_null_mean": float(np.mean(best)),
                         "best_cindex_null_p95": float(np.percentile(best, 95)),
                         "best_oriented_null_mean": float(np.mean(best_or)),
                         "best_oriented_null_p95": float(np.percentile(best_or, 95)),
-                        "n_perm": args.n_perm}
+                        "n_perm": args.n_perm,
+                        "best_cindex_null": best, "best_oriented_null": best_or}
         print(f"  {model}: family-wise null p95 = {nulls[model]['best_cindex_null_p95']:.3f}"
               f"  (either direction: {nulls[model]['best_oriented_null_p95']:.3f})", flush=True)
 
@@ -179,7 +266,11 @@ def main(argv=None):
         cph = CoxPHFitter(penalizer=0.01).fit(d, duration_col=tm, event_col=ev)
         d["score"] = cph.predict_partial_hazard(d)
         ref["pam50_cindex"] = cindex(d, tm, ev, "score")
-        print(f"  reference (PAM50): C = {ref['pam50_cindex']:.3f}", flush=True)
+        print(f"  reference as coded (PAM50 + age + stage, in sample): C = {ref['pam50_cindex']:.3f}",
+              flush=True)
+        ref.update(clinical_references(clin, ev, tm, args.endpoint))
+    ref["proliferation"] = proliferation_reference(clin, zexpr, gene_mean, T, E, ok, ev, tm,
+                                                   args.n_floor, C.N_REF_PERM)
 
     pd.DataFrame(rows).to_csv(out / "scores.csv", index=False)
     json.dump({"nulls": nulls, "reference": ref, "endpoint": args.endpoint,

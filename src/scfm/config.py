@@ -91,7 +91,31 @@ N_BOOTSTRAP = 20 if SMOKE else 200      # patient bootstraps for intervals
 N_JOBS = int(os.environ.get("SCFM_N_JOBS", "8"))   # worker processes; results do not depend on it
 EXPRESSION_BINS = 10          # for matching random sets on mean expression
 SEED = 42
+# Analyses added after the pre-registered run each draw from their own generator, so the
+# pre-registered streams (SEED: floors, nulls, bootstrap; SEED + 1: sensitivity bootstrap)
+# and every number they produce stay unchanged.
+SEED_REF_CV = SEED + 4        # cross-validation folds of the reference Cox models
+SEED_REF_FLOOR = SEED + 5     # matched-random floor of the proliferation reference
+SEED_P2_BOOT = SEED + 6       # selection-aware patient bootstrap (P2)
+SEED_P3_PERM = SEED + 7       # within-subtype outcome permutations (P3)
+SEED_ADDED_VALUE = SEED + 8   # cross-validation folds of the added-value models
+SEED_STRATIFY = SEED + 9      # cross-validation folds of the multivariable stratification
+SEED_REF_PERM = SEED + 10     # outcome permutations of the proliferation reference
+N_CV_SPLITS = 5
+N_CV_REPEATS = 5
+N_REF_PERM = 20 if SMOKE else 500
+N_P3_PERM = 20 if SMOKE else 1_000
+P3_MIN_EVENTS = 10            # subtypes with fewer events are not tested within
+ALPHA = 0.05
+
+# PAM50 11-gene proliferation score (Nielsen et al. 2010; ROR-P, Parker et al. 2009), as published;
+# aliases are resolved against the bulk symbols at run time
+PROLIFERATION_GENES = {
+    "BIRC5": [], "CCNB1": [], "CDC20": [], "CDCA1": ["NUF2"], "CEP55": [], "KNTC2": ["NDC80"],
+    "MKI67": [], "PTTG1": [], "RRM2": [], "TYMS": [], "UBE2C": [],
+}
 
 # ---- prediction thresholds ---------------------------------------------------------------
-P3_WITHIN_SUBTYPE_CINDEX = 0.6   # P3 passes if the C-index exceeds this within any subtype
-P4_MAX_HVG_FRAC = 0.5            # P4 passes if fewer than this fraction of signature genes are HVGs
+P3_WITHIN_SUBTYPE_CINDEX = 0.6   # P3 as coded: passes if the C-index exceeds this within any subtype
+P4_MAX_HVG_FRAC = 0.5            # P4 as coded: passes if fewer than this fraction of signature genes are HVGs
+SINGLE_DONOR_FRAC = 0.8          # flagged single-donor when one donor gives this share of a state's cells

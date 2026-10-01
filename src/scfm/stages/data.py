@@ -31,14 +31,21 @@ def sha256(path: Path) -> str:
 
 
 def fetch(url: str, dest: Path) -> Path:
-    if not dest.exists():
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        print(f"  downloading {url.split('/')[-1]} …", flush=True)
-        urllib.request.urlretrieve(url, dest)
+    """Download to <dest>.part and move it into place only once its sha256 matches the pin."""
     want = C.XENA_SHA256.get(dest.name)
-    if want is not None and (got := sha256(dest)) != want:
-        raise RuntimeError(f"{dest}: sha256 {got} does not match the pinned {want}; "
-                           "the upstream file changed or the download is corrupt")
+    if dest.exists():
+        if want is not None and (got := sha256(dest)) != want:
+            raise RuntimeError(f"{dest}: sha256 {got} does not match the pinned {want}; "
+                               f"delete {dest} and rerun")
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    print(f"  downloading {url.split('/')[-1]} …", flush=True)
+    urllib.request.urlretrieve(url, part)
+    if want is not None and (got := sha256(part)) != want:
+        raise RuntimeError(f"{part}: sha256 {got} does not match the pinned {want}; the upstream file "
+                           f"changed or the download is corrupt; delete {part} and rerun")
+    part.replace(dest)
     return dest
 
 

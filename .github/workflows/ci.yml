@@ -2,6 +2,7 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -18,4 +19,4 @@ jobs:
       - name: Lint
         run: uv run --locked ruff check src tests
       - name: Test
-        run: uv run --locked pytest -q
+        run: uv run --locked pytest -q -rs

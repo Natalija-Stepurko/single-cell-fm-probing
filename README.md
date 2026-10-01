@@ -71,7 +71,8 @@ than the checkout.
 uv run scfm list
 make smoke          # SCFM_SMOKE=1 scfm run all: 2,000 cells, short control loops, writes smoke/; ~10 min
 make all            # scfm run all: the study
-make reproduce      # bulk cohort + translate -> ladder -> report from the tracked signatures; ~15 min
+make reproduce      # bulk cohort + translate -> ladder -> report (OS, then PFI) from the tracked signatures; ~30 min
+                    # needs only `uv sync --locked --group dev` (no models, no atlas)
 make verify         # compare results/ with results/MANIFEST.sha256
 ```
 
