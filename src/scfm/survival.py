@@ -1,7 +1,6 @@
-"""Survival-analysis helpers shared by stages 04–06.
+"""Survival-analysis helpers shared by the data, translate, ladder and report stages.
 
-Kept separate from qc_common.py (which is a verbatim copy from the protein study) so that file
-stays diff-able against its source. Everything here operates on pandas frames indexed by patient.
+Everything here operates on pandas frames indexed by patient.
 """
 from __future__ import annotations
 
@@ -19,8 +18,8 @@ def zscore_genes(expr: pd.DataFrame) -> pd.DataFrame:
 def score_signature(zexpr: pd.DataFrame, genes: list[str]) -> pd.Series:
     """Mean z-score of the signature genes present in the matrix, one value per patient.
 
-    Deliberately the simplest transparent scorer. ssGSEA is an option behind a flag in stage 04;
-    it is not the default because it adds a tunable that the ladder would then have to sweep.
+    Deliberately the simplest transparent scorer. ssGSEA is not implemented: it would add a
+    tunable that the ladder would then have to sweep.
     """
     present = [g for g in genes if g in zexpr.index]
     if len(present) < 3:

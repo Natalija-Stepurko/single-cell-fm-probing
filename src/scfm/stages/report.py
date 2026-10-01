@@ -12,16 +12,14 @@ validation.md       the three-step validation each shortlisted state would need
 """
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
-import config as C
-import qc_common as qc
-from surv_common import score_signature, zscore_genes
+from scfm import config as C
+from scfm.provenance import record_params
+from scfm.survival import score_signature, zscore_genes
 
 COL = {"hvg_pca": "#4A4F55", "scgpt": "#1F6F6B", "geneformer": "#C2681A"}
 
@@ -97,7 +95,7 @@ def fig_hvg(scores, out):
     fig, ax = plt.subplots(figsize=(5.6, 3.6))
     for m, g in scores.groupby("model"):
         ax.scatter(g["hvg_frac"], g["above_floor"], s=14, alpha=.7, color=COL.get(m, "#888"), label=m)
-    ax.axhline(0, color="#16191D", lw=1); ax.axvline(0.5, color="#B9C0C6", lw=1, ls=":")
+    ax.axhline(0, color="#16191D", lw=1); ax.axvline(C.P4_MAX_HVG_FRAC, color="#B9C0C6", lw=1, ls=":")
     ax.set_xlabel("fraction of signature genes that are HVGs")
     ax.set_ylabel("C-index above matched-random floor")
     ax.set_title("P4 — do the informative signatures live outside the HVG set?", fontsize=9, loc="left")
@@ -106,7 +104,7 @@ def fig_hvg(scores, out):
     fig.tight_layout(); fig.savefig(out / "fig_hvg.png", dpi=150); plt.close(fig)
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default=str(C.DATA))
     ap.add_argument("--states-dir", default=str(C.RESULTS / "states"))
@@ -114,7 +112,7 @@ def main():
     ap.add_argument("--ladder-dir", default=str(C.RESULTS / "ladder"))
     ap.add_argument("--out-dir", default=str(C.RESULTS / "report"))
     ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     if args.dry_run:
         print(json.dumps({"figures": ["fig_ladder", "fig_margin", "fig_km", "fig_hvg"],
@@ -143,7 +141,6 @@ def main():
                [r["signature"]]["genes"], ev, tm, top, out)
 
     # shortlist: FM signatures above floor AND above the family-wise null
-    null95 = {m: L["predictions"].get(m, {}) for m in fm}
     sl = scores[(scores["kind"] == "fm") & (scores["above_floor"] > 0)].copy()
     sl = sl[sl.apply(lambda r: r["cindex"] > ladder.loc[r["model"], "null_p95"], axis=1)]
     sl = sl.sort_values("above_floor", ascending=False).head(10)
@@ -155,7 +152,8 @@ def main():
         genes = sigs[r["model"]][str(r["resolution"])][r["signature"]]["genes"]
         md += [f"## {r['model']} · {r['signature']} — {r['top_cell_type']}",
                f"C = {r['cindex']:.3f} (floor {r['floor_mean']:.3f}, +{r['above_floor']:.3f}); "
-               f"HR {r['hr']:.2f}, p = {r['p']:.2g}; {r['n_cells']:,} cells; HVG fraction {r['hvg_frac']:.2f}",
+               f"HR {r['hr']:.2f}, p = {r['p']:.2g}; {r['n_cells']:,} cells; "
+               f"HVG fraction {r['hvg_frac']:.2f}",
                "", "`" + "`, `".join(genes[:25]) + ("`, …" if len(genes) > 25 else "`"), ""]
     (out / "shortlist.md").write_text("\n".join(md))
 
@@ -169,7 +167,7 @@ def main():
         "state's abundance in FFPE sections from a cohort with outcome, and the effect size it would "
         "need to reach to matter clinically.", "",
         "Nothing on the shortlist is a target or biomarker until step 1 has passed.", ""]))
-    qc.record_params(out, args, extra={"n_shortlisted": len(sl)})
+    record_params(out, args, extra={"n_shortlisted": len(sl)})
     print(f"  figures + shortlist ({len(sl)}) + validation template -> {out}")
 
 

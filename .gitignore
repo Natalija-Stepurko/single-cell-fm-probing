@@ -9,11 +9,17 @@ wheels/
 # Virtual environments
 .venv
 .venv-scfm
+envs/scgpt/.venv
+
+# Tool caches
+.ruff_cache/
+.pytest_cache/
 
 # Saved embedding tensors, downloaded data, and results
 # results: small text outputs and figures are tracked; embeddings and shards are not
 results/*
 !results/atlas_cells.csv
+!results/MANIFEST.sha256
 !results/run_log.json
 !results/states/
 !results/translate/
@@ -27,7 +33,7 @@ cells/
 results_test/
 cells_test/
 
-# Model weight caches (should live under HF_HOME on /scratch, never in-repo)
+# Model weight caches (should live under HF_HOME, never in-repo)
 *.pt
 *.ckpt
 *.h5ad
@@ -41,9 +47,6 @@ api_keys.py
 
 # Claude Code worktrees
 .claude/
-
-# Reserved for a manuscript in preparation -- not yet public
-paper/
 
 # Local agent config -- machine-specific, references co-located projects
 CLAUDE.md

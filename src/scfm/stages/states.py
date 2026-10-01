@@ -9,14 +9,12 @@ Also records, per signature, the fraction of its genes that are HVGs — the qua
 """
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).parent))
-import config as C
-import qc_common as qc
+from scfm import config as C
+from scfm.provenance import record_params
 
 
 def signatures_for(adata, X: np.ndarray, resolutions, topks, min_cells, seed, universe=None):
@@ -55,7 +53,7 @@ def signatures_for(adata, X: np.ndarray, resolutions, topks, min_cells, seed, un
     return out
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default=str(C.DATA))
     ap.add_argument("--emb-dir", default=str(C.RESULTS / "embeddings"))
@@ -66,7 +64,7 @@ def main():
     ap.add_argument("--min-cells", type=int, default=C.MIN_CELLS_PER_STATE)
     ap.add_argument("--seed", type=int, default=C.SEED)
     ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
 
     if args.dry_run:
@@ -96,7 +94,7 @@ def main():
 
     json.dump(sigs, open(out / "signatures.json", "w"))
     json.dump(summary, open(out / "summary.json", "w"), indent=2)
-    qc.record_params(out, args, extra=summary)
+    record_params(out, args, extra=summary)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,14 @@
 
 Everything a stage needs to know about *which* study this is lives here, so a second indication
 is a second config block, not a second pipeline.
+
+Paths resolve against ROOT: the repository checkout, or $SCFM_ROOT when set.
 """
 import os
 from pathlib import Path
 
-ROOT = Path("/data/scfm")
+REPO = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ["SCFM_ROOT"]) if os.environ.get("SCFM_ROOT") else REPO
 # SCFM_SMOKE=1 runs every stage end to end on a small atlas and short control loops,
 # writing to smoke/ so it never touches the real outputs.
 SMOKE = os.environ.get("SCFM_SMOKE") == "1"
@@ -43,6 +46,12 @@ XENA_EXPR = "https://tcga.xenahubs.net/download/TCGA.BRCA.sampleMap/HiSeqV2.gz"
 XENA_CLIN = "https://tcga.xenahubs.net/download/TCGA.BRCA.sampleMap/BRCA_clinicalMatrix"
 XENA_SURV = ("https://tcga-pancan-atlas-hub.s3.us-east-1.amazonaws.com/download/"
              "Survival_SupplementalTable_S1_20171025_xena_sp")
+# sha256 of each download, keyed by the file name it is saved under in data/raw/
+XENA_SHA256 = {
+    "HiSeqV2.gz": "263bf67245cc4b9062676583c0ff0306f08471a26aafd5504037e1da22133746",
+    "BRCA_clinicalMatrix": "39eb3be0fb86e6a577bd2cc01502a7fa5a271e1e1cba294e9dc644ad99580d7f",
+    "TCGA_CDR_survival.tsv": "a5e704158bb5c51cded8a368accd999dfb259d428e88bbb0c4386078c5df9617",
+}
 PRIMARY_TUMOUR_SUFFIX = "-01"  # TCGA sample-type code for primary solid tumour
 ENDPOINTS = {"OS": ("OS", "OS.time"), "PFI": ("PFI", "PFI.time")}
 PRIMARY_ENDPOINT = "OS"
@@ -53,14 +62,15 @@ SUBTYPE_COLUMN = "PAM50Call_RNAseq"      # the Reference rung; also the P3 strat
 MODELS = {
     "hvg_pca":    {"kind": "baseline", "n_comps": 50},
     # whole-human checkpoint as released by the authors' lab; CLS embedding, L2-normalised
-    "scgpt":      {"kind": "fm", "hf_repo": "wanglab/scGPT-human", "max_len": 1200},
+    "scgpt":      {"kind": "fm", "hf_repo": "wanglab/scGPT-human",
+                   "revision": "a24c237737a40f3720f75abb555489e9fe753be6", "max_len": 1200},
     # 6-layer V1 model (pretrained on ~30M cells); needs the V1 (gc30M) dictionaries
-    "geneformer": {"kind": "fm", "hf_repo": "ctheodoris/Geneformer", "variant": "Geneformer-V1-10M",
-                   "dict_dir": "geneformer/gene_dictionaries_30m", "max_len": 2048,
-                   "layers": "last"},
+    "geneformer": {"kind": "fm", "hf_repo": "ctheodoris/Geneformer",
+                   "revision": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5", "variant": "Geneformer-V1-10M",
+                   "dict_dir": "geneformer/gene_dictionaries_30m", "max_len": 2048},
 }
-# scGPT pins torchtext and old scvi-tools, so it runs in its own environment.
-SCGPT_PYTHON = os.environ.get("SCGPT_PYTHON", "/scratch/.venv-scgpt/bin/python")
+# scGPT pins torchtext and an older torch, so it runs in its own environment (envs/scgpt).
+SCGPT_PYTHON = os.environ.get("SCGPT_PYTHON", str(REPO / "envs/scgpt/.venv/bin/python"))
 
 # ---- embedding runtime (CPU) -------------------------------------------------------------
 TORCH_THREADS = 4             # physical cores; hyperthreads do not help GEMMs
@@ -78,6 +88,10 @@ MIN_CELLS_PER_STATE = 20 if SMOKE else 200
 N_PERMUTATIONS = 20 if SMOKE else 500   # outcome permutations for the family-wise null
 N_FLOOR_SETS = 20 if SMOKE else 200     # matched random gene sets per signature
 N_BOOTSTRAP = 20 if SMOKE else 200      # patient bootstraps for intervals
-N_JOBS = 8
+N_JOBS = int(os.environ.get("SCFM_N_JOBS", "8"))   # worker processes; results do not depend on it
 EXPRESSION_BINS = 10          # for matching random sets on mean expression
 SEED = 42
+
+# ---- prediction thresholds ---------------------------------------------------------------
+P3_WITHIN_SUBTYPE_CINDEX = 0.6   # P3 passes if the C-index exceeds this within any subtype
+P4_MAX_HVG_FRAC = 0.5            # P4 passes if fewer than this fraction of signature genes are HVGs

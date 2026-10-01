@@ -34,47 +34,45 @@ on the project page; the tables behind them are in `results/`.
 
 ## Pipeline
 
-| Stage | Script | Does |
+| Stage | Module (`src/scfm/`) | Does |
 |---|---|---|
-| 01 | `01_data.py` | CELLxGENE Census atlas (QC, HVGs, stratified subsample) + TCGA-BRCA bulk, clinical and survival from UCSC Xena; gene harmonisation |
-| 02 | `02_embed.py` | per-cell embeddings: `hvg_pca`, `scgpt` (via `scgpt_worker.py`), `geneformer`, one schema |
-| 03 | `03_states.py` | Leiden clusters per representation → marker-gene signatures, swept over resolution × top-k |
-| 04 | `04_translate.py` | signature scores in bulk; age- and stage-adjusted Cox; C-index; family-wise permutation null; matched-random floor; PAM50 reference |
-| 05 | `05_ladder.py` | the ladder, patient-bootstrap intervals, predictions P1–P4 |
-| 06 | `06_report.py` | figures, candidate shortlist, validation-strategy template |
-| — | `run.py` | stages as named tools with a JSON run log (`run.py list`, `run.py all --dry-run`) |
+| 01 | `stages/data.py` | CELLxGENE Census atlas (QC, HVGs, stratified subsample) + TCGA-BRCA bulk, clinical and survival from UCSC Xena; gene harmonisation |
+| 02 | `stages/embed.py` | per-cell embeddings: `hvg_pca`, `scgpt` (via `scgpt_worker.py`), `geneformer`, one schema |
+| 03 | `stages/states.py` | Leiden clusters per representation → marker-gene signatures, swept over resolution × top-k |
+| 04 | `stages/translate.py` | signature scores in bulk; age- and stage-adjusted Cox; C-index; family-wise permutation null; matched-random floor; PAM50 reference |
+| 05 | `stages/ladder.py` | the ladder, patient-bootstrap intervals, predictions P1–P4 |
+| 06 | `stages/report.py` | figures, candidate shortlist, validation-strategy template |
+| — | `cli.py` | stages as named tools with a JSON run log (`scfm list`, `scfm run all --dry-run`) |
 
 Every stage writes `params.json` beside its outputs: arguments, command, git commit, library
 versions, timestamp.
 
 ## Setup
 
-Two environments, both built with `uv`. scGPT pins `torchtext` and old `scvi-tools`, so it has its
-own Python 3.11 environment; stage 02 calls it as a subprocess.
+Two environments, both locked with `uv`. scGPT pins `torchtext` and an older `torch`, so it has its
+own Python 3.11 environment (`envs/scgpt`); the embed stage calls it as a subprocess.
 
 ```bash
-# main environment: every stage except the scGPT forward pass
-export UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm
-export HF_HOME=/scratch/.hf-cache          # model weights land here, not on the root disk
-uv sync
-
-# scGPT environment
-uv venv --python 3.11 /scratch/.venv-scgpt
-uv pip install --python /scratch/.venv-scgpt/bin/python \
-    --index-url https://download.pytorch.org/whl/cpu torch==2.3.1
-uv pip install --python /scratch/.venv-scgpt/bin/python torchtext==0.18.0 "numpy<2" \
-    "scanpy<1.11" "anndata<0.11" pandas scikit-learn scikit-misc numba "datasets<3" ipython
-uv pip install --python /scratch/.venv-scgpt/bin/python --no-deps scgpt==0.2.4
+# main environment: the scfm package, every stage except the scGPT forward pass
+export UV_PROJECT_ENVIRONMENT=/scratch/.venv-scfm   # optional; default is .venv in the checkout
+export HF_HOME=/scratch/.hf-cache                  # optional; where model weights land
+make setup          # uv sync --locked --all-extras --group dev
+make scgpt-env      # envs/scgpt/.venv from envs/scgpt/uv.lock (CPU torch 2.3.1, scgpt 0.2.4)
+make test lint
 ```
 
-Checkpoints download on first use from Hugging Face: Geneformer `Geneformer-V1-10M` with its V1
-dictionaries (`ctheodoris/Geneformer`), and the scGPT whole-human checkpoint as released by the
-authors' lab (`wanglab/scGPT-human`). Set `SCGPT_PYTHON` if the scGPT environment lives elsewhere.
+Checkpoints download on first use from Hugging Face at pinned revisions: Geneformer
+`Geneformer-V1-10M` with its V1 dictionaries (`ctheodoris/Geneformer`), and the scGPT whole-human
+checkpoint as released by the authors' lab (`wanglab/scGPT-human`). Set `SCGPT_PYTHON` if the scGPT
+environment lives elsewhere, and `SCFM_ROOT` to read `data/` and write `results/` somewhere other
+than the checkout.
 
 ```bash
-uv run python scripts/run.py list
-SCFM_SMOKE=1 uv run python scripts/run.py all   # 2,000 cells, short control loops, writes smoke/; ~8 min
-uv run python scripts/run.py all                # the study
+uv run scfm list
+make smoke          # SCFM_SMOKE=1 scfm run all: 2,000 cells, short control loops, writes smoke/; ~10 min
+make all            # scfm run all: the study
+make reproduce      # bulk cohort + translate -> ladder -> report from the tracked signatures; ~15 min
+make verify         # compare results/ with results/MANIFEST.sha256
 ```
 
 ### Runtime
@@ -90,7 +88,7 @@ Measured on 4 physical CPU cores (Xeon Platinum 8573C, no GPU):
 
 Embedding runs in bfloat16 on CPUs with AMX. Against fp32 on 300 cells, per-cell cosine similarity
 was at least 0.9999 for both models and 98% of 15-nearest neighbours were unchanged.
-`02_embed.py --precision fp32 --limit 300` repeats the check. Cells are sorted by length and packed
+`scfm run embed -- --precision fp32 --limit 300` repeats the check. Cells are sorted by length and packed
 into batches, and results are written in shards, so an interrupted stage 02 resumes.
 
 ## Data
@@ -121,7 +119,10 @@ docs/index.html       the project page (GitHub Pages); rebuilt by docs/site/buil
 results/              tracked: cell list, signatures, scores, nulls, ladder, report figures, params
                       and run log (5 MB); embeddings and shards stay local
 research/             literature and novelty notes
-scripts/              01–06 stages, run.py orchestrator, config.py, qc_common.py, surv_common.py
+src/scfm/             the package: stages/ (01–06), cli.py, config.py, provenance.py, survival.py,
+                      batching.py, geneformer.py, scgpt_worker.py, verify.py
+envs/scgpt/           the locked scGPT environment (Python 3.11)
+tests/                pytest, offline except the Geneformer dictionaries
 data/  smoke/        git-ignored
 ```
 

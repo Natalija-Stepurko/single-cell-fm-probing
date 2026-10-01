@@ -20,16 +20,14 @@ Output: results/translate/scores.csv, nulls.json, params.json.
 """
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
-import config as C
-import qc_common as qc
-from surv_common import cindex, fit_cox, matched_random_sets, score_signature, zscore_genes
+from scfm import config as C
+from scfm.provenance import record_params
+from scfm.survival import cindex, fit_cox, matched_random_sets, score_signature, zscore_genes
 
 
 def load_bulk(data_dir: Path):
@@ -95,7 +93,7 @@ def _oriented(ci0, floor):
             "above_floor_or": c - float(np.mean(f)) if f else np.nan}
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default=str(C.DATA))
     ap.add_argument("--states-dir", default=str(C.RESULTS / "states"))
@@ -105,7 +103,7 @@ def main():
     ap.add_argument("--n-floor", type=int, default=C.N_FLOOR_SETS)
     ap.add_argument("--seed", type=int, default=C.SEED)
     ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     ev, tm = C.ENDPOINTS[args.endpoint]
 
@@ -186,7 +184,7 @@ def main():
     pd.DataFrame(rows).to_csv(out / "scores.csv", index=False)
     json.dump({"nulls": nulls, "reference": ref, "endpoint": args.endpoint,
                "n_patients": n_pat, "n_events": n_ev}, open(out / "nulls.json", "w"), indent=2)
-    qc.record_params(out, args, extra={"n_signatures": len(rows), "n_events": n_ev})
+    record_params(out, args, extra={"n_signatures": len(rows), "n_events": n_ev})
 
 
 if __name__ == "__main__":

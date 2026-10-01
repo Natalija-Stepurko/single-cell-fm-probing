@@ -1,6 +1,6 @@
 """scGPT cell embeddings, run inside the scGPT environment (Python 3.11, torch 2.3, torchtext).
 
-Called by 02_embed.py; not a pipeline stage. Mirrors scgpt.tasks.cell_emb.embed_data: genes
+Called by the embed stage; not a pipeline stage. Mirrors scgpt.tasks.cell_emb.embed_data: genes
 matched to the checkpoint vocabulary, per-cell expression binning, <cls> prepended, CLS output
 of the encoder, L2-normalised. Differences are throughput only: cells are sorted by length and
 packed to a token budget, the forward pass can run in bfloat16, and results are
@@ -18,10 +18,9 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-sys.path.insert(0, str(Path(__file__).parent))
-from importlib import import_module
-
-emb = import_module("02_embed")          # length_batches, run_sharded: numpy-only helpers
+# run as a script from the scGPT environment, where scfm is not installed: import it from src/
+sys.path[0] = str(Path(__file__).resolve().parents[1])
+from scfm.batching import run_sharded  # noqa: E402
 
 
 def main():
@@ -29,6 +28,7 @@ def main():
     ap.add_argument("--input", required=True)
     ap.add_argument("--shard-dir", required=True)
     ap.add_argument("--hf-repo", required=True)
+    ap.add_argument("--revision", default=None)
     ap.add_argument("--precision", default="bf16", choices=["bf16", "fp32"])
     ap.add_argument("--max-len", type=int, default=1200)
     ap.add_argument("--tokens-per-batch", type=int, default=32768)
@@ -44,7 +44,7 @@ def main():
     from scgpt.tokenizer import GeneVocab
     from scgpt.utils import load_pretrained
 
-    mdir = Path(snapshot_download(a.hf_repo))
+    mdir = Path(snapshot_download(a.hf_repo, revision=a.revision))
     cfg = json.load(open(mdir / "args.json"))
     vocab = GeneVocab.from_file(mdir / "vocab.json")
     for s in ["<pad>", "<cls>", "<eoc>"]:
@@ -94,8 +94,8 @@ def main():
 
     lengths = np.minimum(np.diff(X.indptr) + 1, a.max_len)
     t0 = time.time()
-    E = emb.run_sharded(X.shape[0], lengths, cfg["embsize"], Path(a.shard_dir), forward,
-                        a.tokens_per_batch, a.shard_cells)
+    E = run_sharded(X.shape[0], lengths, cfg["embsize"], Path(a.shard_dir), forward,
+                    a.tokens_per_batch, a.shard_cells)
     np.save(Path(a.shard_dir) / "embedding.npy", E)
     print(f"    scGPT: {X.shape[0]:,} cells in {time.time() - t0:.0f}s", flush=True)
 

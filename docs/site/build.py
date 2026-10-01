@@ -15,8 +15,8 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
-import config as C  # noqa: E402
+sys.path.insert(0, str(ROOT / "src"))
+from scfm import config as C  # noqa: E402
 
 OUT = ROOT / "docs" / "index.html"
 REPORT = C.RESULTS / "report"
