@@ -1,12 +1,12 @@
 {
   "script": "translate.py",
-  "timestamp_utc": "2026-10-01T13:40:13+00:00",
-  "command": "src/scfm/stages/translate.py",
+  "timestamp_utc": "2026-10-01T14:02:04+00:00",
+  "command": "src/scfm/stages/translate.py --endpoint PFI",
   "args": {
     "data_dir": "data",
     "states_dir": "results/states",
-    "out_dir": "results/translate",
-    "endpoint": "OS",
+    "out_dir": "results/translate_pfi",
+    "endpoint": "PFI",
     "n_perm": 500,
     "n_floor": 200,
     "seed": 42,
@@ -39,6 +39,6 @@
   },
   "extra": {
     "n_signatures": 783,
-    "n_events": 151
+    "n_events": 145
   }
 }

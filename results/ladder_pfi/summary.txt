@@ -1,0 +1,39 @@
+Ladder — PFI, 1094 patients, 145 events
+reference (PAM50) C = 0.673
+
+  hvg_pca     C=0.569 [0.513,0.611]  floor=0.475  null95=0.583  hvg=0.20  malignant cell
+  geneformer  C=0.565 [0.509,0.606]  floor=0.476  null95=0.578  hvg=0.21  malignant cell
+  scgpt       C=0.564 [0.506,0.606]  floor=0.476  null95=0.579  hvg=0.21  malignant cell
+
+  geneformer: P1=False P2=False (margin -0.004 [-0.008,-0.000]) P3=True P4=True
+  scgpt: P1=False P2=False (margin -0.005 [-0.009,-0.002]) P3=True P4=True
+
+Sensitivity — each signature read in the direction it acts (added after the primary run)
+  scgpt       C=0.605 [0.561,0.644]  floor=0.510  null95=0.589  hvg=0.28  protective  malignant cell
+  hvg_pca     C=0.569 [0.508,0.615]  floor=0.475  null95=0.590  hvg=0.20  risk  malignant cell
+  geneformer  C=0.565 [0.505,0.613]  floor=0.476  null95=0.585  hvg=0.21  risk  malignant cell
+  scgpt: P1=True P2=False (margin +0.039 [-0.022,+0.099]) P3=True P4=True
+  geneformer: P1=False P2=False (margin -0.004 [-0.008,-0.000]) P3=True P4=True
+
+Corrected statistics (beside the pre-registered ones above)
+  reference clinical        n=821 events=111  in-sample C=0.648  CV C=0.623±0.011
+  reference pam50           n=821 events=111  in-sample C=0.597  CV C=0.554±0.013
+  reference pam50_clinical  n=821 events=111  in-sample C=0.673  CV C=0.646±0.006
+  reference clinical_full   n=1072 events=138  in-sample C=0.688  CV C=0.678±0.010
+  reference proliferation   C=0.566 floor=0.480 perm p=0.014
+  primary     hvg_pca     family max 0.569 (0.3/c25_k100) fw p=0.178; pick p=0.178; P1_corrected=False
+  primary     scgpt       family max 0.564 (1.0/c18_k100) fw p=0.218; pick p=0.218; P1_corrected=False
+  primary     geneformer  family max 0.567 (0.5/c5_k100) fw p=0.156; pick p=0.186; P1_corrected=False
+  primary     scgpt       P2 above-floor margin -0.007 [-0.046,+0.013] (selection-aware) P2_corrected=False
+  primary     geneformer  P2 above-floor margin -0.005 [-0.045,+0.000] (selection-aware) P2_corrected=False
+  sensitivity hvg_pca     family max 0.597 (0.5/c27_k50) fw p=0.028; pick p=0.333; P1_corrected=True
+  sensitivity scgpt       family max 0.605 (1.0/c32_k25) fw p=0.010; pick p=0.010; P1_corrected=True
+  sensitivity geneformer  family max 0.588 (1.0/c14_k25) fw p=0.040; pick p=0.347; P1_corrected=True
+  sensitivity scgpt       P2 above-floor margin +0.001 [-0.032,+0.021] (selection-aware) P2_corrected=False
+  sensitivity geneformer  P2 above-floor margin -0.005 [-0.039,+0.016] (selection-aware) P2_corrected=False
+  P3 primary/hvg_pca         max within-subtype C 0.626 (LumB) p=0.124
+  P3 primary/geneformer      max within-subtype C 0.619 (LumB) p=0.148
+  P3 primary/scgpt           max within-subtype C 0.619 (LumB) p=0.138
+  P3 sensitivity/scgpt       max within-subtype C 0.606 (LumA) p=0.235
+  P3 sensitivity/hvg_pca     max within-subtype C 0.626 (LumB) p=0.124
+  P3 sensitivity/geneformer  max within-subtype C 0.619 (LumB) p=0.148

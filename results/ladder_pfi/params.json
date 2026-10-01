@@ -1,13 +1,13 @@
 {
   "script": "ladder.py",
-  "timestamp_utc": "2026-10-01T13:41:26+00:00",
-  "command": "src/scfm/stages/ladder.py",
+  "timestamp_utc": "2026-10-01T14:03:17+00:00",
+  "command": "src/scfm/stages/ladder.py --endpoint PFI",
   "args": {
     "data_dir": "data",
     "states_dir": "results/states",
-    "endpoint": "OS",
-    "translate_dir": "results/translate",
-    "out_dir": "results/ladder",
+    "endpoint": "PFI",
+    "translate_dir": "results/translate_pfi",
+    "out_dir": "results/ladder_pfi",
     "n_boot": 200,
     "seed": 42,
     "dry_run": false
@@ -39,41 +39,41 @@
   },
   "extra": {
     "predictions": {
-      "scgpt": {
-        "P1_above_floor": false,
-        "P2_margin_over_baseline": 0.030102702470367358,
-        "P2_margin_ci": [
-          -0.04898346109003071,
-          0.10227455647089594
-        ],
-        "P2_pass": false,
-        "P4_hvg_frac": 0.12,
-        "P4_pass": true,
-        "P3_within_subtype_cindex": {
-          "Basal": 0.5491202346041055,
-          "Her2": 0.4891304347826087,
-          "LumA": 0.4651101437805039,
-          "LumB": 0.5831188883170355
-        },
-        "P3_pass": false
-      },
       "geneformer": {
         "P1_above_floor": false,
-        "P2_margin_over_baseline": -0.0024829018969266346,
+        "P2_margin_over_baseline": -0.004235007201708199,
         "P2_margin_ci": [
-          -0.07913772722152342,
-          0.06901878151579913
+          -0.008268015244612948,
+          -0.00031233136203368976
         ],
         "P2_pass": false,
         "P4_hvg_frac": 0.21,
         "P4_pass": true,
         "P3_within_subtype_cindex": {
-          "Basal": 0.5293255131964809,
-          "Her2": 0.3695652173913043,
-          "LumA": 0.4054874027173196,
-          "LumB": 0.5826042202779207
+          "Basal": 0.498001998001998,
+          "Her2": 0.42105263157894735,
+          "LumA": 0.4082174328484977,
+          "LumB": 0.6191500806885423
         },
-        "P3_pass": false
+        "P3_pass": true
+      },
+      "scgpt": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": -0.005427461370194523,
+        "P2_margin_ci": [
+          -0.009170259367266948,
+          -0.0019387776173012455
+        ],
+        "P2_pass": false,
+        "P4_hvg_frac": 0.21,
+        "P4_pass": true,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.5004995004995005,
+          "Her2": 0.4116541353383459,
+          "LumA": 0.4056693916551651,
+          "LumB": 0.6186121570736955
+        },
+        "P3_pass": true
       }
     },
     "verdicts": {
@@ -83,7 +83,7 @@
           "P1_corrected": false,
           "P2_as_coded": false,
           "P2_corrected": false,
-          "P3_as_coded": false,
+          "P3_as_coded": true,
           "P3_corrected": false,
           "P4_as_coded": true,
           "P4_corrected": null
@@ -93,7 +93,7 @@
           "P1_corrected": false,
           "P2_as_coded": false,
           "P2_corrected": false,
-          "P3_as_coded": false,
+          "P3_as_coded": true,
           "P3_corrected": false,
           "P4_as_coded": true,
           "P4_corrected": null
@@ -101,18 +101,18 @@
       },
       "sensitivity": {
         "scgpt": {
-          "P1_as_coded": false,
+          "P1_as_coded": true,
           "P1_corrected": true,
           "P2_as_coded": false,
           "P2_corrected": false,
           "P3_as_coded": true,
-          "P3_corrected": true,
+          "P3_corrected": false,
           "P4_as_coded": true,
           "P4_corrected": null
         },
         "geneformer": {
           "P1_as_coded": false,
-          "P1_corrected": false,
+          "P1_corrected": true,
           "P2_as_coded": false,
           "P2_corrected": false,
           "P3_as_coded": true,

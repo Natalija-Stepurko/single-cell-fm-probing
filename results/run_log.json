@@ -105,5 +105,87 @@
   "rc": 0,
   "dry_run": false,
   "params": "/data/scfm/results/report/params.json"
+ },
+ {
+  "stage": "states",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.states"
+  ],
+  "started": 1790860108.1079042,
+  "seconds": 740.0,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/states/params.json"
+ },
+ {
+  "stage": "translate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.translate"
+  ],
+  "started": 1790860848.1175697,
+  "seconds": 1165.5,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/translate/params.json"
+ },
+ {
+  "stage": "ladder",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.ladder"
+  ],
+  "started": 1790862013.6960719,
+  "seconds": 72.7,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/ladder/params.json"
+ },
+ {
+  "stage": "report",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.report"
+  ],
+  "started": 1790862086.4082963,
+  "seconds": 3.5,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/report/params.json"
+ },
+ {
+  "stage": "translate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.translate",
+   "--endpoint",
+   "PFI"
+  ],
+  "started": 1790862089.9482486,
+  "seconds": 1235.5,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/translate_pfi/params.json"
+ },
+ {
+  "stage": "ladder",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.ladder",
+   "--endpoint",
+   "PFI"
+  ],
+  "started": 1790863325.4888701,
+  "seconds": 72.6,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/ladder_pfi/params.json"
  }
 ]
