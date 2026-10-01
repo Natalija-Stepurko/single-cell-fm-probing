@@ -459,5 +459,19 @@
   "rc": 0,
   "dry_run": false,
   "params": "results/stratify/params.json"
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--real-outcomes"
+  ],
+  "started": 1790872688.4085524,
+  "seconds": 261.1,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/replicate/params.json"
  }
 ]
