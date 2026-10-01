@@ -168,8 +168,9 @@ def main(argv=None):
 
     ref, dummies = subtype_dummies(d.dropna(subset=["subtype"]))
     folds_ref = cv_folds(ref[ev], C.N_CV_SPLITS, C.N_CV_REPEATS, rng)
-    res_ref = run_cv({"clinical_pam50": ("cox", cov + dummies), "clinical_on_pam50_set": ("cox", cov)},
-                     ref, tm, ev, folds_ref, n_jobs)
+    specs_ref = {"clinical_pam50": ("cox", cov + dummies), "clinical_on_pam50_set": ("cox", cov)}
+    res_ref = run_cv(specs_ref, ref, tm, ev, folds_ref, n_jobs)
+    all_specs = {**specs, **specs_ref}
 
     def model_type(name):
         return name.split("_", 1)[0] if name.startswith(("ridge_", "xgb_")) else None
@@ -181,9 +182,9 @@ def main(argv=None):
         on_ref = name in res_ref
         base_name = "clinical_on_pam50_set" if on_ref else "clinical"
         base = (res_ref if on_ref else res)[base_name]["cindex"]
-        kind = specs[name][0] if name in specs else "cox"
+        kind = all_specs[name][0]
         s = {"kind": kind, **(cohort_ref if on_ref else cohort),
-             "n_features": len(specs[name][1]) if name in specs else len(cov) + len(dummies),
+             "n_features": len(all_specs[name][1]),
              "cindex_mean": float(r["cindex"].mean()), "cindex_sd": float(r["cindex"].std(ddof=1)),
              "cindex_per_repeat": r["cindex"].tolist(),
              "vs_clinical": (None if name == base_name
