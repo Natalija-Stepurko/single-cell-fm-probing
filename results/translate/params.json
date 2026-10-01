@@ -1,6 +1,6 @@
 {
   "script": "translate.py",
-  "timestamp_utc": "2026-10-01T13:40:13+00:00",
+  "timestamp_utc": "2026-10-01T15:46:11+00:00",
   "command": "src/scfm/stages/translate.py",
   "args": {
     "data_dir": "data",
@@ -12,7 +12,7 @@
     "seed": 42,
     "dry_run": false
   },
-  "git_commit": "00a00c7efb771c0eb02a0514b8a9fe2f7aab12da",
+  "git_commit": "e2a817ae29153e9fc8a56470899a8cfd8d575fb0",
   "git_dirty": false,
   "versions": {
     "python": "3.12.3",

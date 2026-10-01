@@ -183,8 +183,12 @@
       "n": 821,
       "events": 116,
       "cindex_in_sample": 0.738192084347989,
+      "cindex_in_sample_mle": 0.7377104016698333,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.7320024619336885,
       "cindex_cv_sd": 0.004028109118332257,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.7341780620300249,
         0.7351949476839091,
@@ -204,8 +208,12 @@
       "n": 821,
       "events": 116,
       "cindex_in_sample": 0.5978351039631781,
+      "cindex_in_sample_mle": 0.5567315154272258,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.5248039819101395,
       "cindex_cv_sd": 0.01708852218328017,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.5340389092563355,
         0.5312959940057267,
@@ -227,8 +235,12 @@
       "n": 821,
       "events": 116,
       "cindex_in_sample": 0.7445476196847655,
+      "cindex_in_sample_mle": 0.7452835237763922,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.7230940084026868,
       "cindex_cv_sd": 0.006758067494241521,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.7295753164387594,
         0.7293210950252883,
@@ -246,8 +258,12 @@
       "n": 1072,
       "events": 142,
       "cindex_in_sample": 0.7554142316947404,
+      "cindex_in_sample_mle": 0.7554142316947404,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.7512203506359574,
       "cindex_cv_sd": 0.0029588040458873384,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.7510599289561132,
         0.7531634173091719,
@@ -291,12 +307,14 @@
       "cindex": 0.5689623338257016,
       "hr_adjusted": 1.2123689207533277,
       "p_adjusted": 0.03274859684492495,
+      "hr_adjusted_definition": "per unit of the mean-z score, Cox with age and stage, lifelines penalizer 0.01 (ridge), Wald p",
       "floor_mean": 0.4797047328902018,
       "floor_p95": 0.5415281880846874,
       "above_floor": 0.08925760093549978,
       "n_floor": 200,
-      "perm_p": 0.00998003992015968,
-      "n_perm": 500,
+      "perm_p": 0.0084991500849915,
+      "n_perm": 10000,
+      "perm_p_mc_se": 0.0009179822728584844,
       "seeds": {
         "floor": 47,
         "perm": 52
@@ -318,11 +336,17 @@
         "argmax_top_cell_type": [
           "malignant cell"
         ],
-        "argmax_above_floor": 0.0838344719350073,
+        "argmax_above_floor": [
+          0.0838344719350073
+        ],
         "fw_p": 0.1596806387225549,
+        "fw_p_mc_se": 0.01638186389515624,
+        "fw_p_borderline": false,
         "pick_stat": 0.5474366075824717,
         "pick_fw_p": 0.7025948103792415,
+        "pick_fw_p_mc_se": 0.02044286392888233,
         "n_perm": 500,
+        "P1_floor_condition": "every maximising signature above its floor",
         "P1_corrected": false
       },
       "scgpt": {
@@ -333,11 +357,17 @@
         "argmax_top_cell_type": [
           "malignant cell"
         ],
-        "argmax_above_floor": 0.0741361244460856,
+        "argmax_above_floor": [
+          0.0741361244460856
+        ],
         "fw_p": 0.12574850299401197,
+        "fw_p_mc_se": 0.014828069125059871,
+        "fw_p_borderline": false,
         "pick_stat": 0.576101674052191,
         "pick_fw_p": 0.12574850299401197,
+        "pick_fw_p_mc_se": 0.014828069125059871,
         "n_perm": 500,
+        "P1_floor_condition": "every maximising signature above its floor",
         "P1_corrected": false
       },
       "geneformer": {
@@ -348,11 +378,17 @@
         "argmax_top_cell_type": [
           "malignant cell"
         ],
-        "argmax_above_floor": 0.0454627492614475,
+        "argmax_above_floor": [
+          0.0454627492614475
+        ],
         "fw_p": 0.36726546906187624,
+        "fw_p_mc_se": 0.021558364701277147,
+        "fw_p_borderline": false,
         "pick_stat": 0.5464826440177253,
         "pick_fw_p": 0.5868263473053892,
+        "pick_fw_p_mc_se": 0.02202095299543614,
         "n_perm": 500,
+        "P1_floor_condition": "every maximising signature above its floor",
         "P1_corrected": false
       }
     },
@@ -369,11 +405,19 @@
           "malignant cell",
           "malignant cell"
         ],
-        "argmax_above_floor": 0.0914532557853272,
+        "argmax_above_floor": [
+          0.0914532557853272,
+          0.096101827917282,
+          0.0909154972919742
+        ],
         "fw_p": 0.023952095808383235,
+        "fw_p_mc_se": 0.006837893376584526,
+        "fw_p_borderline": false,
         "pick_stat": 0.5912419990152634,
         "pick_fw_p": 0.0658682634730539,
+        "pick_fw_p_mc_se": 0.011093208313206622,
         "n_perm": 500,
+        "P1_floor_condition": "every maximising signature above its floor",
         "P1_corrected": true
       },
       "scgpt": {
@@ -384,11 +428,17 @@
         "argmax_top_cell_type": [
           "malignant cell"
         ],
-        "argmax_above_floor": 0.0808431037666175,
+        "argmax_above_floor": [
+          0.0808431037666175
+        ],
         "fw_p": 0.033932135728542916,
+        "fw_p_mc_se": 0.008097005112193354,
+        "fw_p_borderline": true,
         "pick_stat": 0.5829486706056131,
         "pick_fw_p": 0.09780439121756487,
+        "pick_fw_p_mc_se": 0.013284479084715847,
         "n_perm": 500,
+        "P1_floor_condition": "every maximising signature above its floor",
         "P1_corrected": true
       },
       "geneformer": {
@@ -399,11 +449,17 @@
         "argmax_top_cell_type": [
           "malignant cell"
         ],
-        "argmax_above_floor": 0.0812817731413095,
+        "argmax_above_floor": [
+          0.0812817731413095
+        ],
         "fw_p": 0.05189620758483034,
+        "fw_p_mc_se": 0.009919978953923495,
+        "fw_p_borderline": true,
         "pick_stat": 0.5782711718365336,
         "pick_fw_p": 0.17165668662674652,
+        "pick_fw_p_mc_se": 0.01686360984861032,
         "n_perm": 500,
+        "P1_floor_condition": "every maximising signature above its floor",
         "P1_corrected": false
       }
     }
@@ -413,84 +469,96 @@
       "scgpt": {
         "margin": -0.020630616075824698,
         "ci": [
-          -0.07527426176500829,
-          0.00860949642143868
+          -0.0779005187059307,
+          0.012412996645915893
         ],
         "P2_pass": false,
-        "boot_mean": -0.02660721438951522,
-        "n_boot": 200,
+        "boot_mean": -0.0260503504427675,
+        "n_boot": 1000,
+        "ci_definition": "two-sided 95% percentile interval; P2_pass is the one-sided test lower > 0, and an upper bound near 0 is not evidence that the FM is worse",
         "pick_reselected_frac": {
-          "scgpt": 0.205,
-          "hvg_pca": 0.28
+          "scgpt": 0.228,
+          "hvg_pca": 0.287
         },
         "floors": "held at their full-cohort values",
         "P2_margin_as_coded": 0.030102702470367358,
         "P2_margin_ci_as_coded": [
           -0.04898346109003071,
           0.10227455647089594
-        ]
+        ],
+        "P2_point_as_coded": 0.028665066469719336,
+        "as_coded_definition": "P2_margin_as_coded: bootstrap mean of raw C(FM pick) - C(baseline pick), picks fixed; P2_point_as_coded: the same difference on the full cohort; margin: the floor-adjusted full-cohort point estimate"
       },
       "geneformer": {
         "margin": -0.038808468734613494,
         "ci": [
-          -0.07839846649842254,
-          -0.0019814490247420553
+          -0.08370236405811969,
+          -0.00120466227911601
         ],
         "P2_pass": false,
-        "boot_mean": -0.036525669770274646,
-        "n_boot": 200,
+        "boot_mean": -0.03740166958079658,
+        "n_boot": 1000,
+        "ci_definition": "two-sided 95% percentile interval; P2_pass is the one-sided test lower > 0, and an upper bound near 0 is not evidence that the FM is worse",
         "pick_reselected_frac": {
-          "geneformer": 0.28,
-          "hvg_pca": 0.28
+          "geneformer": 0.214,
+          "hvg_pca": 0.287
         },
         "floors": "held at their full-cohort values",
         "P2_margin_as_coded": -0.0024829018969266346,
         "P2_margin_ci_as_coded": [
           -0.07913772722152342,
           0.06901878151579913
-        ]
+        ],
+        "P2_point_as_coded": -0.0009539635647464184,
+        "as_coded_definition": "P2_margin_as_coded: bootstrap mean of raw C(FM pick) - C(baseline pick), picks fixed; P2_point_as_coded: the same difference on the full cohort; margin: the floor-adjusted full-cohort point estimate"
       }
     },
     "sensitivity": {
       "scgpt": {
         "margin": -0.010364583333333302,
         "ci": [
-          -0.05467280889255344,
-          0.01814275628141745
+          -0.05383048453377938,
+          0.018152045693982072
         ],
         "P2_pass": false,
-        "boot_mean": -0.01159951697395335,
-        "n_boot": 200,
+        "boot_mean": -0.01123001972210864,
+        "n_boot": 1000,
+        "ci_definition": "two-sided 95% percentile interval; P2_pass is the one-sided test lower > 0, and an upper bound near 0 is not evidence that the FM is worse",
         "pick_reselected_frac": {
-          "scgpt": 0.185,
-          "hvg_pca": 0.095
+          "scgpt": 0.16,
+          "hvg_pca": 0.115
         },
         "floors": "held at their full-cohort values",
         "P2_margin_as_coded": -0.009489718593078717,
         "P2_margin_ci_as_coded": [
           -0.04368886724804301,
           0.021745072082440413
-        ]
+        ],
+        "P2_point_as_coded": -0.008293328409650358,
+        "as_coded_definition": "P2_margin_as_coded: bootstrap mean of raw C(FM pick) - C(baseline pick), picks fixed; P2_point_as_coded: the same difference on the full cohort; margin: the floor-adjusted full-cohort point estimate"
       },
       "geneformer": {
         "margin": -0.013150618537666206,
         "ci": [
-          -0.058437902319294376,
-          0.01916502964445895
+          -0.06303645701505177,
+          0.02091283575750047
         ],
         "P2_pass": false,
-        "boot_mean": -0.017809640448075897,
-        "n_boot": 200,
+        "boot_mean": -0.018950404897123366,
+        "n_boot": 1000,
+        "ci_definition": "two-sided 95% percentile interval; P2_pass is the one-sided test lower > 0, and an upper bound near 0 is not evidence that the FM is worse",
         "pick_reselected_frac": {
-          "geneformer": 0.195,
-          "hvg_pca": 0.095
+          "geneformer": 0.2,
+          "hvg_pca": 0.115
         },
         "floors": "held at their full-cohort values",
         "P2_margin_as_coded": -0.012659317634914614,
         "P2_margin_ci_as_coded": [
           -0.0764367381600232,
           0.043675242106577805
-        ]
+        ],
+        "P2_point_as_coded": -0.012970827178729771,
+        "as_coded_definition": "P2_margin_as_coded: bootstrap mean of raw C(FM pick) - C(baseline pick), picks fixed; P2_point_as_coded: the same difference on the full cohort; margin: the floor-adjusted full-cohort point estimate"
       }
     }
   },
@@ -502,7 +570,7 @@
       "LumB"
     ],
     "n_patients": 819,
-    "n_perm": 1000,
+    "n_perm": 10000,
     "note": "pick and direction fixed on the full cohort, which contains these patients",
     "picks": {
       "primary/hvg_pca": {
@@ -514,9 +582,11 @@
         },
         "stat": 0.5843108504398827,
         "argmax_subtype": "Basal",
-        "p": 0.3966033966033966,
+        "p": 0.38196180381961803,
         "P3_pass": false,
-        "null_p95": 0.6732038123167153,
+        "p_mc_se": 0.004858672496088635,
+        "borderline": false,
+        "null_p95": 0.6642228739002932,
         "rule_as_coded": false
       },
       "primary/scgpt": {
@@ -528,9 +598,11 @@
         },
         "stat": 0.5831188883170355,
         "argmax_subtype": "LumB",
-        "p": 0.36663336663336665,
+        "p": 0.388961103889611,
         "P3_pass": false,
-        "null_p95": 0.6557106456291704,
+        "p_mc_se": 0.00487514475221594,
+        "borderline": false,
+        "null_p95": 0.6630434782608695,
         "rule_as_coded": false
       },
       "primary/geneformer": {
@@ -542,9 +614,11 @@
         },
         "stat": 0.5826042202779207,
         "argmax_subtype": "LumB",
-        "p": 0.4015984015984016,
+        "p": 0.4002599740025997,
         "P3_pass": false,
-        "null_p95": 0.6631024480428407,
+        "p_mc_se": 0.004899509436811383,
+        "borderline": false,
+        "null_p95": 0.6652173913043479,
         "rule_as_coded": false
       },
       "sensitivity/hvg_pca": {
@@ -556,9 +630,11 @@
         },
         "stat": 0.702018203403245,
         "argmax_subtype": "LumA",
-        "p": 0.014985014985014986,
+        "p": 0.0156984301569843,
         "P3_pass": true,
-        "null_p95": 0.6630434782608696,
+        "p_mc_se": 0.0012430603142080672,
+        "borderline": false,
+        "null_p95": 0.6671554252199414,
         "rule_as_coded": true
       },
       "sensitivity/scgpt": {
@@ -570,9 +646,11 @@
         },
         "stat": 0.6675900277008311,
         "argmax_subtype": "LumA",
-        "p": 0.04795204795204795,
-        "P3_pass": true,
-        "null_p95": 0.6635630498533724,
+        "p": 0.05039496050394961,
+        "P3_pass": false,
+        "p_mc_se": 0.002187585620261638,
+        "borderline": true,
+        "null_p95": 0.6678960906359093,
         "rule_as_coded": true
       },
       "sensitivity/geneformer": {
@@ -584,9 +662,11 @@
         },
         "stat": 0.6268656716417911,
         "argmax_subtype": "LumB",
-        "p": 0.16583416583416583,
+        "p": 0.1494850514948505,
         "P3_pass": false,
-        "null_p95": 0.6696739130434782,
+        "p_mc_se": 0.003565659418318474,
+        "borderline": false,
+        "null_p95": 0.6656891495601174,
         "rule_as_coded": true
       }
     }
@@ -618,20 +698,24 @@
       "scgpt": {
         "P1_as_coded": false,
         "P1_corrected": false,
+        "P1_corrected_borderline": false,
         "P2_as_coded": false,
         "P2_corrected": false,
         "P3_as_coded": false,
         "P3_corrected": false,
+        "P3_corrected_borderline": false,
         "P4_as_coded": true,
         "P4_corrected": null
       },
       "geneformer": {
         "P1_as_coded": false,
         "P1_corrected": false,
+        "P1_corrected_borderline": false,
         "P2_as_coded": false,
         "P2_corrected": false,
         "P3_as_coded": false,
         "P3_corrected": false,
+        "P3_corrected_borderline": false,
         "P4_as_coded": true,
         "P4_corrected": null
       }
@@ -640,20 +724,24 @@
       "scgpt": {
         "P1_as_coded": false,
         "P1_corrected": true,
+        "P1_corrected_borderline": true,
         "P2_as_coded": false,
         "P2_corrected": false,
         "P3_as_coded": true,
-        "P3_corrected": true,
+        "P3_corrected": false,
+        "P3_corrected_borderline": true,
         "P4_as_coded": true,
         "P4_corrected": null
       },
       "geneformer": {
         "P1_as_coded": false,
         "P1_corrected": false,
+        "P1_corrected_borderline": true,
         "P2_as_coded": false,
         "P2_corrected": false,
         "P3_as_coded": true,
         "P3_corrected": false,
+        "P3_corrected_borderline": false,
         "P4_as_coded": true,
         "P4_corrected": null
       }
@@ -662,6 +750,11 @@
   "universe": {
     "universe_n": 16297,
     "universe_n_hvg": 1526
+  },
+  "monte_carlo": {
+    "p2_bootstrap_resamples": 1000,
+    "p3_permutations": 10000,
+    "borderline": "a permutation p within 2 Monte-Carlo SE of alpha"
   },
   "seeds": {
     "p2_bootstrap": 48,
@@ -697,10 +790,16 @@
       "now_reported": "Max over subtypes (Basal, Her2, LumA, LumB) of the within-subtype C, against 1,000 within-subtype outcome permutations, for every representation including the baseline; P3_corrected = p < 0.05. Pick and direction were fixed on the full cohort, which contains these patients."
     },
     {
+      "id": "monte_carlo_error",
+      "design": "Decisions at alpha = 0.05.",
+      "as_coded": "Permutation p-values from 500 or 1,000 permutations, without Monte-Carlo error.",
+      "now_reported": "Every permutation p carries its Monte-Carlo SE and a borderline flag (within 2 SE of 0.05); P3 uses 10,000 permutations and the selection-aware P2 bootstrap 1,000 resamples (both their own streams). The family-wise null keeps its pre-registered 500 permutations."
+    },
+    {
       "id": "P4_gate",
       "design": "FM signatures that pass P2 are enriched for genes outside the HVG set.",
       "as_coded": "hvg_frac < 0.5 for the FM pick, evaluated whether or not P2 passed; no enrichment test.",
-      "now_reported": "Not applicable unless P2_corrected passes; when it does, a hypergeometric HVG-depletion test against the scored-gene universe and a Mann-Whitney test of the FM's HVG fractions against the baseline's."
+      "now_reported": "Not applicable unless P2_corrected passes; when it does, a hypergeometric HVG-depletion test of the pick against the scored-gene universe and the pick's HVG fraction ranked among the baseline's signatures (baseline_rank_p)."
     },
     {
       "id": "per_setting_ladder",
@@ -711,8 +810,26 @@
     {
       "id": "covariate_adjustment",
       "design": "Cox models adjusted for age and stage in the primary model.",
-      "as_coded": "Every ladder C-index is Harrell's C of the unadjusted score; the adjusted Cox model fed only the hr and p columns of scores.csv.",
-      "now_reported": "added_value.csv: HR per SD, likelihood-ratio p and cross-validated change in C of each pick over age + stage (n with both) and over age + stage + PAM50."
+      "as_coded": "Every ladder C-index is Harrell's C of the unadjusted score; the adjusted Cox model (lifelines penalizer 0.01, Wald p, per unit of the mean-z score) fed only the hr and p columns of scores.csv.",
+      "now_reported": "added_value.csv: HR per SD, likelihood-ratio p and cross-validated change in C of each pick over age + stage (n with both) and over age + stage + PAM50, one row per role. Every pick and family maximum was selected, and its direction set, on the outcomes of the same patients (selected_on_outcome); for those rows lrt_p_nominal is not adjusted for selection and the fixed-signature CV change in C is optimistic. The nested CV columns redo the selection (and orientation) inside every training fold; only the pre-specified proliferation reference is free of selection. The lo/hi columns span fold repeats on the same patients, not a confidence interval."
+    },
+    {
+      "id": "selection_conditional_intervals",
+      "design": "Bootstrap intervals over patients for the ladder.",
+      "as_coded": "ladder.csv ci_lo/ci_hi and P2_margin_ci_as_coded bootstrap the picked signatures with the pick held fixed, so they ignore the selection over 201-369 signatures per representation and are conditional on it; P2_margin_as_coded is the bootstrap mean of the raw C difference, not a full-cohort point estimate.",
+      "now_reported": "Kept as coded; P2_point_as_coded gives the full-cohort raw C difference, and the selection-aware P2 interval re-selects the picks in every resample."
+    },
+    {
+      "id": "clustering_stability",
+      "design": "Cell-level clustering is done once; its stability is a separate diagnostic.",
+      "as_coded": "The stability diagnostic was not run.",
+      "now_reported": "Not run; the states are reported at three resolutions and nine settings instead (ladder_by_setting.csv)."
+    },
+    {
+      "id": "reference_penalty",
+      "design": "Reference rung: PAM50 subtype.",
+      "as_coded": "Cox reference fits use lifelines penalizer 0.01 (a ridge of 0.01 x n on standardised covariates).",
+      "now_reported": "Each reference entry gives the penalizer, the in-sample C of the penalised fit and of the unpenalised fit (they differ for PAM50 alone, whose LumA and Basal hazards are nearly equal), and the cross-validated C, which is the figure to compare with."
     },
     {
       "id": "secondary_endpoint",

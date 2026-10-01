@@ -187,5 +187,250 @@
   "rc": 0,
   "dry_run": false,
   "params": "results/ladder_pfi/params.json"
+ },
+ {
+  "stage": "translate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.translate"
+  ],
+  "started": 1790865601.8780966,
+  "seconds": 887.9,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/translate/params.json"
+ },
+ {
+  "stage": "translate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.translate",
+   "--endpoint",
+   "PFI"
+  ],
+  "started": 1790866489.775939,
+  "seconds": 956.1,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/translate_pfi/params.json"
+ },
+ {
+  "stage": "ladder",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.ladder"
+  ],
+  "started": 1790867463.8650017,
+  "seconds": 200.2,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/ladder/params.json"
+ },
+ {
+  "stage": "ladder",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.ladder",
+   "--endpoint",
+   "PFI"
+  ],
+  "started": 1790867736.578655,
+  "seconds": 222.0,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/ladder_pfi/params.json"
+ },
+ {
+  "stage": "report",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.report"
+  ],
+  "started": 1790867979.2155788,
+  "seconds": 3.3,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/report/params.json"
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--freeze"
+  ],
+  "started": 1790868016.0017936,
+  "seconds": 1.2,
+  "rc": 0,
+  "dry_run": false
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--freeze"
+  ],
+  "started": 1790868031.08313,
+  "seconds": 0.7,
+  "rc": 1,
+  "dry_run": false
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--freeze",
+   "--force"
+  ],
+  "started": 1790868031.8910515,
+  "seconds": 0.9,
+  "rc": 0,
+  "dry_run": false
+ },
+ {
+  "stage": "stratify",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.stratify"
+  ],
+  "started": 1790867992.0868325,
+  "seconds": 65.2,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/stratify/params.json"
+ },
+ {
+  "stage": "stratify",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.stratify"
+  ],
+  "started": 1790868177.2511675,
+  "seconds": 61.1,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/stratify/params.json"
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--shuffle-outcomes"
+  ],
+  "started": 1790868307.8202043,
+  "seconds": 271.4,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/replicate_shuffled/params.json"
+ },
+ {
+  "stage": "translate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.translate"
+  ],
+  "started": 1790868639.2619112,
+  "seconds": 932.7,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/translate/params.json"
+ },
+ {
+  "stage": "ladder",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.ladder"
+  ],
+  "started": 1790869572.044824,
+  "seconds": 199.0,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/ladder/params.json"
+ },
+ {
+  "stage": "translate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.translate",
+   "--endpoint",
+   "PFI"
+  ],
+  "started": 1790869771.125752,
+  "seconds": 995.1,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/translate_pfi/params.json"
+ },
+ {
+  "stage": "ladder",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.ladder",
+   "--endpoint",
+   "PFI"
+  ],
+  "started": 1790870766.2310393,
+  "seconds": 231.4,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/ladder_pfi/params.json"
+ },
+ {
+  "stage": "stratify",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.stratify"
+  ],
+  "started": 1790870997.6948113,
+  "seconds": 61.4,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/stratify/params.json"
+ },
+ {
+  "stage": "report",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.report"
+  ],
+  "started": 1790871059.170679,
+  "seconds": 3.4,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/report/params.json"
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--freeze",
+   "--force"
+  ],
+  "started": 1790871062.5920482,
+  "seconds": 0.4,
+  "rc": 0,
+  "dry_run": false
  }
 ]

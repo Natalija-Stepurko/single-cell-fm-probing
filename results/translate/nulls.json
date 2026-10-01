@@ -3044,8 +3044,12 @@
       "n": 821,
       "events": 116,
       "cindex_in_sample": 0.738192084347989,
+      "cindex_in_sample_mle": 0.7377104016698333,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.7320024619336885,
       "cindex_cv_sd": 0.004028109118332257,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.7341780620300249,
         0.7351949476839091,
@@ -3065,8 +3069,12 @@
       "n": 821,
       "events": 116,
       "cindex_in_sample": 0.5978351039631781,
+      "cindex_in_sample_mle": 0.5567315154272258,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.5248039819101395,
       "cindex_cv_sd": 0.01708852218328017,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.5340389092563355,
         0.5312959940057267,
@@ -3088,8 +3096,12 @@
       "n": 821,
       "events": 116,
       "cindex_in_sample": 0.7445476196847655,
+      "cindex_in_sample_mle": 0.7452835237763922,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.7230940084026868,
       "cindex_cv_sd": 0.006758067494241521,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.7295753164387594,
         0.7293210950252883,
@@ -3107,8 +3119,12 @@
       "n": 1072,
       "events": 142,
       "cindex_in_sample": 0.7554142316947404,
+      "cindex_in_sample_mle": 0.7554142316947404,
+      "penalizer": 0.01,
+      "penalty": "lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the in-sample C, with single-signature C-indices",
       "cindex_cv_mean": 0.7512203506359574,
       "cindex_cv_sd": 0.0029588040458873384,
+      "cindex_cv_sd_definition": "sd over fold repeats on the same patients (not a confidence interval)",
       "cindex_cv_repeats": [
         0.7510599289561132,
         0.7531634173091719,
@@ -3152,12 +3168,14 @@
       "cindex": 0.5689623338257016,
       "hr_adjusted": 1.2123689207533277,
       "p_adjusted": 0.03274859684492495,
+      "hr_adjusted_definition": "per unit of the mean-z score, Cox with age and stage, lifelines penalizer 0.01 (ridge), Wald p",
       "floor_mean": 0.4797047328902018,
       "floor_p95": 0.5415281880846874,
       "above_floor": 0.08925760093549978,
       "n_floor": 200,
-      "perm_p": 0.00998003992015968,
-      "n_perm": 500,
+      "perm_p": 0.0084991500849915,
+      "n_perm": 10000,
+      "perm_p_mc_se": 0.0009179822728584844,
       "seeds": {
         "floor": 47,
         "perm": 52
@@ -3168,6 +3186,12 @@
       "floor_or_p95": 0.5415281880846874,
       "above_floor_or": 0.08925760093549978
     }
+  },
+  "definitions": {
+    "scores.hr, scores.p": "per unit of the mean-z score, Cox with age and stage, lifelines penalizer 0.01 (ridge), Wald p",
+    "reference.proliferation.hr_adjusted, p_adjusted": "same definition as scores.hr and scores.p",
+    "reference.*.cindex_cv_sd": "sd over fold repeats on the same patients (not a confidence interval)",
+    "*_mc_se": "Monte-Carlo standard error sqrt(p(1-p)/n) of a permutation p from n permutations"
   },
   "endpoint": "OS",
   "n_patients": 1094,

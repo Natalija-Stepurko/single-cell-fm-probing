@@ -1,6 +1,6 @@
 {
   "script": "report.py",
-  "timestamp_utc": "2026-10-01T13:41:29+00:00",
+  "timestamp_utc": "2026-10-01T16:11:02+00:00",
   "command": "src/scfm/stages/report.py",
   "args": {
     "data_dir": "data",
@@ -10,7 +10,7 @@
     "out_dir": "results/report",
     "dry_run": false
   },
-  "git_commit": "00a00c7efb771c0eb02a0514b8a9fe2f7aab12da",
+  "git_commit": "e2a817ae29153e9fc8a56470899a8cfd8d575fb0",
   "git_dirty": false,
   "versions": {
     "python": "3.12.3",

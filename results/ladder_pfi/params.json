@@ -1,6 +1,6 @@
 {
   "script": "ladder.py",
-  "timestamp_utc": "2026-10-01T14:03:17+00:00",
+  "timestamp_utc": "2026-10-01T16:09:57+00:00",
   "command": "src/scfm/stages/ladder.py --endpoint PFI",
   "args": {
     "data_dir": "data",
@@ -12,7 +12,7 @@
     "seed": 42,
     "dry_run": false
   },
-  "git_commit": "00a00c7efb771c0eb02a0514b8a9fe2f7aab12da",
+  "git_commit": "e2a817ae29153e9fc8a56470899a8cfd8d575fb0",
   "git_dirty": false,
   "versions": {
     "python": "3.12.3",
@@ -81,20 +81,24 @@
         "scgpt": {
           "P1_as_coded": false,
           "P1_corrected": false,
+          "P1_corrected_borderline": false,
           "P2_as_coded": false,
           "P2_corrected": false,
           "P3_as_coded": true,
           "P3_corrected": false,
+          "P3_corrected_borderline": false,
           "P4_as_coded": true,
           "P4_corrected": null
         },
         "geneformer": {
           "P1_as_coded": false,
           "P1_corrected": false,
+          "P1_corrected_borderline": false,
           "P2_as_coded": false,
           "P2_corrected": false,
           "P3_as_coded": true,
           "P3_corrected": false,
+          "P3_corrected_borderline": false,
           "P4_as_coded": true,
           "P4_corrected": null
         }
@@ -103,20 +107,24 @@
         "scgpt": {
           "P1_as_coded": true,
           "P1_corrected": true,
+          "P1_corrected_borderline": false,
           "P2_as_coded": false,
           "P2_corrected": false,
           "P3_as_coded": true,
           "P3_corrected": false,
+          "P3_corrected_borderline": false,
           "P4_as_coded": true,
           "P4_corrected": null
         },
         "geneformer": {
           "P1_as_coded": false,
           "P1_corrected": true,
+          "P1_corrected_borderline": true,
           "P2_as_coded": false,
           "P2_corrected": false,
           "P3_as_coded": true,
           "P3_corrected": false,
+          "P3_corrected_borderline": false,
           "P4_as_coded": true,
           "P4_corrected": null
         }

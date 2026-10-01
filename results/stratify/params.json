@@ -1,15 +1,13 @@
 {
-  "script": "translate.py",
-  "timestamp_utc": "2026-10-01T16:06:05+00:00",
-  "command": "src/scfm/stages/translate.py --endpoint PFI",
+  "script": "stratify.py",
+  "timestamp_utc": "2026-10-01T16:10:58+00:00",
+  "command": "src/scfm/stages/stratify.py",
   "args": {
     "data_dir": "data",
     "states_dir": "results/states",
-    "out_dir": "results/translate_pfi",
-    "endpoint": "PFI",
-    "n_perm": 500,
-    "n_floor": 200,
-    "seed": 42,
+    "out_dir": "results/stratify",
+    "endpoint": "OS",
+    "topk": 50,
     "dry_run": false
   },
   "git_commit": "e2a817ae29153e9fc8a56470899a8cfd8d575fb0",
@@ -38,7 +36,12 @@
     "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
   },
   "extra": {
-    "n_signatures": 783,
-    "n_events": 145
+    "n": 1072,
+    "events": 142,
+    "features": {
+      "hvg_pca": 123,
+      "scgpt": 67,
+      "geneformer": 71
+    }
   }
 }
