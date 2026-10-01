@@ -30,9 +30,10 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def fetch(url: str, dest: Path) -> Path:
-    """Download to <dest>.part and move it into place only once its sha256 matches the pin."""
-    want = C.XENA_SHA256.get(dest.name)
+def fetch(url: str, dest: Path, want: str | None = None) -> Path:
+    """Download to <dest>.part and move it into place only once its sha256 matches the pin
+    (`want`, else the Xena pin for this file name)."""
+    want = want or C.XENA_SHA256.get(dest.name)
     if dest.exists():
         if want is not None and (got := sha256(dest)) != want:
             raise RuntimeError(f"{dest}: sha256 {got} does not match the pinned {want}; "

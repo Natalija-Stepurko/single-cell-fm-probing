@@ -103,9 +103,16 @@ SEED_STRATIFY = SEED + 9      # cross-validation folds of the multivariable stra
 SEED_REF_PERM = SEED + 10     # outcome permutations of the proliferation reference
 N_CV_SPLITS = 5
 N_CV_REPEATS = 5
-N_REF_PERM = 20 if SMOKE else 500
-N_P3_PERM = 20 if SMOKE else 1_000
+N_REF_PERM = 20 if SMOKE else 10_000
+N_P3_PERM = 20 if SMOKE else 10_000
+N_P2_BOOT = 20 if SMOKE else 1_000      # selection-aware bootstrap (P2), its own stream
 P3_MIN_EVENTS = 10            # subtypes with fewer events are not tested within
+# multivariable stratification (stage stratify)
+MARKER_TOPK_STRATIFY = 50
+STRATIFY_INNER_SPLITS = 3
+STRATIFY_PENALIZERS = [0.1, 1.0, 10.0, 100.0]
+STRATIFY_XGB = {"max_depth": 2, "learning_rate": 0.05, "n_estimators": 300, "subsample": 0.8,
+                "colsample_bytree": 0.5, "min_child_weight": 5, "random_state": SEED}
 ALPHA = 0.05
 
 # PAM50 11-gene proliferation score (Nielsen et al. 2010; ROR-P, Parker et al. 2009), as published;
@@ -114,6 +121,25 @@ PROLIFERATION_GENES = {
     "BIRC5": [], "CCNB1": [], "CDC20": [], "CDCA1": ["NUF2"], "CEP55": [], "KNTC2": ["NDC80"],
     "MKI67": [], "PTTG1": [], "RRM2": [], "TYMS": [], "UBE2C": [],
 }
+
+# ---- replication cohort: METABRIC (cBioPortal datahub, pinned commit; ODbL: aggregate outputs only) ----
+METABRIC_COMMIT = "dca75cb3f32b82d54a6f78bf0a6323e5b975aca1"
+METABRIC_URL = ("https://media.githubusercontent.com/media/cBioPortal/datahub/"
+                f"{METABRIC_COMMIT}/public/brca_metabric/{{file}}")
+METABRIC_SHA256 = {
+    "data_clinical_patient.txt": "2a6bbadc6e4b2b07c0505559d438da959fc5c9aba55c7194abc394e2d6454995",
+    "data_clinical_sample.txt": "9a2291e065e2a0a5337b4eaeb09836e70b1bc3e1ed17714a013b53515697e6dc",
+    "data_mrna_illumina_microarray.txt": "4470069455a4ed38ffed5d12513e468bbf5b9a57d66fa1162e7bd9a64889ab7a",
+}
+DAYS_PER_MONTH = 30.4375
+REPLICATE_MIN_COVERAGE = 0.8      # a signature is scored only if this share of its genes is measured
+N_REPLICATE_FLOOR = 20 if SMOKE else 200
+N_REPLICATE_PERM = 20 if SMOKE else 1_000
+N_REPLICATE_BOOT = 20 if SMOKE else 1_000
+SEED_REPLICATE_FLOOR = SEED + 11
+SEED_REPLICATE_PERM = SEED + 12
+SEED_REPLICATE_BOOT = SEED + 13
+SEED_REPLICATE_SHUFFLE = SEED + 14   # --shuffle-outcomes only (a test of the stage, not an analysis)
 
 # ---- prediction thresholds ---------------------------------------------------------------
 P3_WITHIN_SUBTYPE_CINDEX = 0.6   # P3 as coded: passes if the C-index exceeds this within any subtype

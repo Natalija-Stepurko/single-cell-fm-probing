@@ -41,7 +41,9 @@ on the project page; the tables behind them are in `results/`.
 | 03 | `stages/states.py` | Leiden clusters per representation → marker-gene signatures, swept over resolution × top-k |
 | 04 | `stages/translate.py` | signature scores in bulk; age- and stage-adjusted Cox; C-index; family-wise permutation null; matched-random floor; PAM50 reference |
 | 05 | `stages/ladder.py` | the ladder, patient-bootstrap intervals, predictions P1–P4 |
+| — | `stages/stratify.py` | cross-validated multivariable models: all of a representation's states vs age + stage, ridge Cox and boosted Cox |
 | 06 | `stages/report.py` | figures, candidate shortlist, validation-strategy template |
+| — | `stages/replicate.py` | METABRIC replication of the frozen signatures (`--freeze`, then `--real-outcomes`; `--shuffle-outcomes` tests the stage); not part of `scfm run all` |
 | — | `cli.py` | stages as named tools with a JSON run log (`scfm list`, `scfm run all --dry-run`) |
 
 Every stage writes `params.json` beside its outputs: arguments, command, git commit, library
@@ -71,7 +73,7 @@ than the checkout.
 uv run scfm list
 make smoke          # SCFM_SMOKE=1 scfm run all: 2,000 cells, short control loops, writes smoke/; ~10 min
 make all            # scfm run all: the study
-make reproduce      # bulk cohort + translate -> ladder -> report (OS, then PFI) from the tracked signatures; ~30 min
+make reproduce      # bulk cohort + translate -> ladder -> stratify -> report (OS, then PFI) from the tracked signatures
                     # needs only `uv sync --locked --group dev` (no models, no atlas)
 make verify         # compare results/ with results/MANIFEST.sha256
 ```

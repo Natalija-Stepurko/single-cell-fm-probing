@@ -5,11 +5,25 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+TIE_TOL = 1e-12   # C-indices sit on a lattice of 1/n_pairs, so exact ties with the null are real
+
 
 def fw_pvalue(stat: float, null) -> float:
-    """Permutation p-value with the +1 correction: (1 + #{null >= stat}) / (1 + n_perm)."""
+    """Permutation p-value with the +1 correction: (1 + #{null >= stat}) / (1 + n_perm); a null
+    value equal to the statistic up to rounding counts as at least as extreme."""
     null = np.asarray(null, dtype=float)
-    return float((1 + np.sum(null >= stat)) / (1 + len(null)))
+    return float((1 + np.sum(null >= stat - TIE_TOL)) / (1 + len(null)))
+
+
+def mc_se(p: float, n: int) -> float:
+    """Monte-Carlo standard error of a permutation or bootstrap proportion from n draws."""
+    return float(np.sqrt(p * (1 - p) / n))
+
+
+def mc_annotate(p: float, n: int, alpha: float = 0.05) -> dict:
+    """The p-value with its Monte-Carlo SE, and `borderline` when it lies within 2 SE of alpha."""
+    se = mc_se(p, n)
+    return {"p": p, "mc_se": se, "n": n, "borderline": bool(abs(p - alpha) < 2 * se)}
 
 
 def direction_of(c):
@@ -106,8 +120,9 @@ def cv_cox_cindex(d: pd.DataFrame, duration: str, event: str, feature_sets: dict
     return {k: np.array(v) for k, v in out.items()}
 
 
-def insample_cindex(d: pd.DataFrame, duration: str, event: str, cols: list[str]) -> float:
-    cph = cox_fit(d, duration, event, cols)
+def insample_cindex(d: pd.DataFrame, duration: str, event: str, cols: list[str],
+                    penalizer: float = 0.01) -> float:
+    cph = cox_fit(d, duration, event, cols, penalizer=penalizer)
     lp = np.asarray(cph.predict_log_partial_hazard(d[cols]), dtype=float)
     return float(cindex_many(lp[None, :], d[duration].to_numpy(float), d[event].to_numpy(float))[0])
 

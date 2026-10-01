@@ -22,8 +22,11 @@ STAGES = [
     ("states",    "Leiden clusters per representation -> marker-gene signatures"),
     ("translate", "score signatures in bulk; Cox; permutation null; matched-random floor; references"),
     ("ladder",    "assemble the ladder; patient bootstraps; test P1-P4, as coded and corrected"),
+    ("stratify",  "cross-validated multivariable stratification: states vs age + stage"),
     ("report",    "figures, candidate shortlist, validation template"),
+    ("replicate", "frozen signatures in METABRIC (run on its own; not part of 'all')"),
 ]
+NOT_IN_ALL = {"replicate"}
 SRC = Path(__file__).resolve().parents[1]
 
 
@@ -88,7 +91,7 @@ def main(argv=None):
             print(f"  {n:<10} {d}")
         print(f"\npython: {sys.executable}\nroot:   {C.ROOT}\nlog:    {log_path()}")
         return 0
-    names = [n for n, _ in STAGES] if a.stage == "all" else [a.stage]
+    names = [n for n, _ in STAGES if n not in NOT_IN_ALL] if a.stage == "all" else [a.stage]
     for n in names:
         if n not in dict(STAGES):
             sys.exit(f"unknown stage {n!r}; try: scfm list")

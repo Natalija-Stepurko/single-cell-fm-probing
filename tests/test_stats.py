@@ -82,3 +82,18 @@ def test_cv_folds_stratified_and_deterministic():
         assert all(ev[te].sum() == 4 for _, te in rep)
     assert all((a[1] == b[1]).all() for ra, rb in zip(f1, f2) for a, b in zip(ra, rb))
     assert not all((a[1] == b[1]).all() for a, b in zip(f1[0], f1[1]))
+
+
+def test_fw_pvalue_counts_a_tie_lost_to_rounding():
+    stat = 0.1 + 0.2                                 # 0.30000000000000004
+    null = [0.7 - 0.4, 0.2]                          # 0.29999999999999993
+    assert null[0] < stat
+    assert fw_pvalue(stat, null) == pytest.approx(2 / 3)
+
+
+def test_mc_annotate_flags_borderline_p():
+    from scfm.stats import mc_annotate
+    a = mc_annotate(0.048, 1000)
+    assert a["mc_se"] == pytest.approx(np.sqrt(0.048 * 0.952 / 1000))
+    assert a["borderline"]
+    assert not mc_annotate(0.01, 10_000)["borderline"]

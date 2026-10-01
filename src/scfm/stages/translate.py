@@ -34,7 +34,7 @@ import pandas as pd
 
 from scfm import config as C
 from scfm.provenance import record_params
-from scfm.stats import cv_cox_cindex, cv_folds, fw_pvalue, insample_cindex
+from scfm.stats import cindex_many, cv_cox_cindex, cv_folds, fw_pvalue, insample_cindex, mc_se
 from scfm.survival import cindex, fit_cox, matched_random_sets, score_signature, zscore_genes
 
 
@@ -110,6 +110,21 @@ def subtype_dummies(d: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     return pd.concat([d, dm], axis=1), list(dm.columns)
 
 
+REF_PENALIZER = 0.01
+PENALTY_NOTE = ("lifelines penalizer 0.01 on the mean partial log-likelihood, i.e. a ridge of 0.01 x n "
+                "on standardised covariates; cindex_in_sample_mle is the unpenalised fit. With few "
+                "groups of near-equal hazard (PAM50 alone) the two can differ: compare the CV C, not the "
+                "in-sample C, with single-signature C-indices")
+CV_SD_NOTE = "sd over fold repeats on the same patients (not a confidence interval)"
+DEFINITIONS = {
+    "scores.hr, scores.p": "per unit of the mean-z score, Cox with age and stage, lifelines penalizer "
+                           "0.01 (ridge), Wald p",
+    "reference.proliferation.hr_adjusted, p_adjusted": "same definition as scores.hr and scores.p",
+    "reference.*.cindex_cv_sd": CV_SD_NOTE,
+    "*_mc_se": "Monte-Carlo standard error sqrt(p(1-p)/n) of a permutation p from n permutations",
+}
+
+
 def clinical_references(clin, ev, tm, endpoint) -> dict:
     """Named Cox references: in-sample C and cross-validated C (repeated event-stratified K-fold,
     pooled out-of-fold linear predictor, Harrell's C per repeat)."""
@@ -127,11 +142,15 @@ def clinical_references(clin, ev, tm, endpoint) -> dict:
             ("clinical_full", C.COVARIATES, full, cv_full["clinical_full"])]:
         out[name] = {"covariates": cols, "n": len(d), "events": int(d[ev].sum()),
                      "cindex_in_sample": insample_cindex(d, tm, ev, cols),
+                     "cindex_in_sample_mle": insample_cindex(d, tm, ev, cols, penalizer=0.0),
+                     "penalizer": REF_PENALIZER, "penalty": PENALTY_NOTE,
                      "cindex_cv_mean": float(cvs.mean()), "cindex_cv_sd": float(cvs.std(ddof=1)),
+                     "cindex_cv_sd_definition": CV_SD_NOTE,
                      "cindex_cv_repeats": cvs.tolist(),
                      "cv": f"{C.N_CV_REPEATS} x {C.N_CV_SPLITS}-fold, stratified by event, "
                            f"seed {C.SEED_REF_CV}"}
-        print(f"  reference {name}: n={len(d)}, in-sample C = {out[name]['cindex_in_sample']:.3f}, "
+        print(f"  reference {name}: n={len(d)}, in-sample C = {out[name]['cindex_in_sample']:.3f} "
+              f"(unpenalised {out[name]['cindex_in_sample_mle']:.3f}), "
               f"CV C = {out[name]['cindex_cv_mean']:.3f} ± {out[name]['cindex_cv_sd']:.3f}", flush=True)
     return out
 
@@ -158,15 +177,19 @@ def proliferation_reference(clin, zexpr, gene_mean, T, E, ok, ev, tm, n_floor, n
     floor = [v for v in _floor_chunk(Zok, T, E, [[[gidx[g] for g in gs] for gs in sets]])[0]]
     sc = _scores(Zok, [gidx[g] for g in genes])
     rng_p = np.random.default_rng(C.SEED_REF_PERM)
-    null = [_ci(T[q], E[q], sc) for q in (rng_p.permutation(len(T)) for _ in range(n_perm))]
+    # scoring patient i against outcome q[i] is scoring outcome j against sc[argsort(q)][j]
+    perm_scores = np.vstack([sc[np.argsort(rng_p.permutation(len(T)))] for _ in range(n_perm)])
+    null = cindex_many(perm_scores, T, E)
     o = _oriented(ci0, floor)
     out = {"name": "PAM50 11-gene proliferation score (Nielsen et al. 2010; ROR-P)",
            "genes_published": list(C.PROLIFERATION_GENES), "genes_used": used,
            "n_genes": len(genes), "n": int(ok.sum()), "events": int(E.sum()),
            "cindex": ci0, "hr_adjusted": hr, "p_adjusted": p,
+           "hr_adjusted_definition": DEFINITIONS["scores.hr, scores.p"],
            "floor_mean": float(np.mean(floor)), "floor_p95": float(np.percentile(floor, 95)),
            "above_floor": ci0 - float(np.mean(floor)), "n_floor": n_floor,
            "perm_p": fw_pvalue(ci0, null), "n_perm": n_perm,
+           "perm_p_mc_se": mc_se(fw_pvalue(ci0, null), n_perm),
            "seeds": {"floor": C.SEED_REF_FLOOR, "perm": C.SEED_REF_PERM}, **o}
     print(f"  reference proliferation: C = {ci0:.3f}, floor {out['floor_mean']:.3f}, "
           f"perm p = {out['perm_p']:.3g}", flush=True)
@@ -273,7 +296,7 @@ def main(argv=None):
                                                    args.n_floor, C.N_REF_PERM)
 
     pd.DataFrame(rows).to_csv(out / "scores.csv", index=False)
-    json.dump({"nulls": nulls, "reference": ref, "endpoint": args.endpoint,
+    json.dump({"nulls": nulls, "reference": ref, "definitions": DEFINITIONS, "endpoint": args.endpoint,
                "n_patients": n_pat, "n_events": n_ev}, open(out / "nulls.json", "w"), indent=2)
     record_params(out, args, extra={"n_signatures": len(rows), "n_events": n_ev})
 

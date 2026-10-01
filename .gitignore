@@ -27,6 +27,8 @@ results/*
 !results/report/
 !results/translate_pfi/
 !results/ladder_pfi/
+!results/stratify/
+!results/replicate/
 results/translate*/null_matrix_*.npz
 results/states/cells_*.parquet
 smoke/
