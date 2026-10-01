@@ -1,6 +1,6 @@
 {
   "script": "stratify.py",
-  "timestamp_utc": "2026-10-01T16:10:58+00:00",
+  "timestamp_utc": "2026-10-01T16:36:26+00:00",
   "command": "src/scfm/stages/stratify.py",
   "args": {
     "data_dir": "data",
@@ -10,8 +10,8 @@
     "topk": 50,
     "dry_run": false
   },
-  "git_commit": "e2a817ae29153e9fc8a56470899a8cfd8d575fb0",
-  "git_dirty": false,
+  "git_commit": "5c156fc192380b4e97e16e2d8b12ec2870434724",
+  "git_dirty": true,
   "versions": {
     "python": "3.12.3",
     "numpy": "2.5.3",

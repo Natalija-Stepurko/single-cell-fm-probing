@@ -147,3 +147,63 @@ The sensitivity analysis reads every signature in the direction it acts on the f
 The primary ladder and predictions are unchanged and remain the pre-registered result. The
 sensitivity ladder is reported beside them and labelled as post hoc.
 
+## 13. Independent replication in METABRIC (specified before the run)
+
+*Written and committed on 2026-10-01, after the TCGA analysis and before any frozen signature was scored
+against METABRIC outcomes. The stage refuses to run on real outcomes unless the frozen file below is committed
+and unmodified.*
+
+**Cohort.** METABRIC (Curtis et al. 2012; Pereira et al. 2016) from the cBioPortal datahub, `brca_metabric`, pinned to
+datahub commit `dca75cb3f32b82d54a6f78bf0a6323e5b975aca1`, files checked by sha256. Illumina HT-12 log2 intensities,
+1,980 patients with expression. Duplicate gene symbols collapse to the row with the highest mean; missing values take
+the gene's mean; every gene is z-scored across patients. METABRIC is ODbL-licensed and downloaded at run time; only
+aggregate statistics are written to `results/`.
+
+**Endpoints.** Overall survival (OS) is primary, as in TCGA. Disease-specific survival (DSS) is secondary: deaths
+from other causes are censored at death, because METABRIC's long follow-up makes many deaths unrelated to the cancer.
+
+**What is frozen.** `results/replicate/frozen_signatures.json` lists every signature with its genes and the direction
+it was read in TCGA. Nothing is re-selected or re-oriented in METABRIC. Signatures with identical gene sets are one
+test.
+
+| Signature | Direction | Genes | TCGA C (in its direction) | Role |
+|---|---|---|---|---|
+| `hvg_pca:0.3/c21_k50` | risk | 50 | 0.547 | primary pick |
+| `scgpt:1.0/c11_k50` | risk | 50 | 0.576 | primary pick, family maximum (primary) |
+| `geneformer:0.3/c14_k100` | risk | 100 | 0.546 | primary pick |
+| `hvg_pca:1.0/c17_k100:protective` | protective | 100 | 0.591 | sensitivity pick, P3 lead (within LumA) |
+| `scgpt:1.0/c8_k50:protective` | protective | 50 | 0.583 | sensitivity pick, P3 lead (within LumA) |
+| `geneformer:1.0/c14_k25:protective` | protective | 25 | 0.578 | sensitivity pick, P3 lead (within LumB) |
+| `hvg_pca:1.0/c50_k50` | risk | 50 | 0.571 | family maximum (primary) |
+| `geneformer:0.5/c13_k25` | risk | 25 | 0.557 | family maximum (primary) |
+| `hvg_pca:0.3/c14_k50:protective` = 0.5/c21_k50, 1.0/c23_k50 | protective | 50 | 0.600 | family maximum (sensitivity) |
+| `scgpt:1.0/c5_k50:protective` | protective | 50 | 0.593 | family maximum (sensitivity) |
+| `geneformer:1.0/c14_k100:protective` | protective | 100 | 0.590 | family maximum (sensitivity) |
+| `reference:proliferation` | risk | 11 | 0.569 | reference |
+
+**Statistics, per signature and endpoint.** A signature is scored only if at least 80% of its genes are measured.
+The concordance index is read in the TCGA direction. A floor of 200 random gene sets matched on size and
+expression bin is drawn in METABRIC and read the same way. An age-adjusted Cox model, stratified by METABRIC
+cohort, gives the hazard ratio per standard deviation of the score in the TCGA direction.
+
+**Replication criterion.** A signature replicates on an endpoint if its oriented C exceeds its METABRIC floor's
+95th percentile *and* its age-adjusted, cohort-stratified hazard ratio is in the TCGA direction with p < 0.05.
+
+**P3 leads.** Every sensitivity-analysis pick is tested within the PAM50 subtype where its TCGA within-subtype C was
+highest (HVG-PCA and scGPT in luminal A, Geneformer in luminal B), whatever its TCGA P3 result: oriented C and a
+within-subtype outcome-permutation p (1,000 permutations). METABRIC's subtype call is PAM50 plus claudin-low; the
+named subtypes are taken as they are.
+
+**Foundation model against baseline.** For the primary and the sensitivity picks, the difference in floor-adjusted
+C between each foundation model's pick and HVG-PCA's pick, with a paired patient bootstrap (1,000 resamples; floors
+held at their METABRIC values). A foundation-model advantage requires the interval to lie above zero.
+
+**How the outcomes will be read.**
+- A replicated signature is evidence that its programme is prognostic beyond one cohort and one platform; it is not
+  evidence for a foundation-model advantage unless the margin interval also lies above zero.
+- If the protective picks of the baseline and of scGPT both replicate, that is one luminal programme found twice,
+  reported as such.
+- A pick that fails the criterion is reported as not replicated, with its numbers; no other signature is tested in
+  its place.
+
+Seeds: floor 53, P3 permutations 54, margin bootstrap 55.

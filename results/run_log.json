@@ -432,5 +432,32 @@
   "seconds": 0.4,
   "rc": 0,
   "dry_run": false
+ },
+ {
+  "stage": "replicate",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.replicate",
+   "--freeze",
+   "--force"
+  ],
+  "started": 1790872503.6957612,
+  "seconds": 0.5,
+  "rc": 0,
+  "dry_run": false
+ },
+ {
+  "stage": "stratify",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.stratify"
+  ],
+  "started": 1790872523.4731147,
+  "seconds": 63.8,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/stratify/params.json"
  }
 ]

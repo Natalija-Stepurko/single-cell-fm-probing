@@ -33,6 +33,18 @@
     "random_state": 42
   },
   "features_note": "signature scores z-scored across the cohort (unsupervised, outside the folds)",
+  "deviations": [
+    {
+      "id": "stratify_ridge_penalty",
+      "design": "one lifelines ridge penalizer over all covariates, chosen by inner CV",
+      "as_run": "the ridge penalty applies to the state features only; age and stage keep 0.01",
+      "why": "with every covariate penalised, inner CV chose the smallest grid value in every fold, because larger values also shrank age and stage; the first run (all covariates penalised) gave ridge scGPT 0.7456 and ridge HVG-PCA 0.7525"
+    },
+    {
+      "id": "stratify_reading",
+      "note": "differences of a few thousandths between models are within the spread across fold seeds; xgboost rows against the clinical model mostly measure how added features dilute age and stage at the fixed hyperparameters, so only same-type comparisons with the baseline are read"
+    }
+  ],
   "models": {
     "clinical": {
       "kind": "cox",

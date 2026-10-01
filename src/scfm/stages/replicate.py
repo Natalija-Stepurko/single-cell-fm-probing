@@ -107,9 +107,8 @@ def _sha(path: Path) -> str:
 
 def freeze(ladder_json: Path, signatures_json: Path, scores_csv: Path, nulls_json: Path) -> dict:
     """The frozen replication spec from the TCGA outputs: picks (primary, sensitivity), family-wise
-    maximisers, P3 leads (the picks whose within-subtype test passed or was borderline, with their
-    subtype) and the proliferation reference; one entry per (signature, direction) with every
-    analysis it serves."""
+    maximisers, P3 leads (every sensitivity pick, within its best TCGA subtype) and the proliferation
+    reference; one entry per (gene set, direction) with every TCGA signature and analysis it serves."""
     lad = json.load(open(ladder_json))
     sigs = json.load(open(signatures_json))
     sc = pd.read_csv(scores_csv)
@@ -119,16 +118,19 @@ def freeze(ladder_json: Path, signatures_json: Path, scores_csv: Path, nulls_jso
 
     def add(model, key, direction, analysis, **extra):
         res, sid = key.split("/", 1)
-        k = (model, key, direction)
+        s = sigs[model][res][sid]
+        k = (model, frozenset(s["genes"]), direction)   # same genes score identically: one test
         if k not in entries:
-            s = sigs[model][res][sid]
             row = sc[(sc["model"] == model) & (sc["key"] == key)].iloc[0]
             entries[k] = {"id": f"{model}:{key}" + ("" if direction == 1 else ":protective"),
                           "model": model, "resolution": res, "signature": sid, "topk": s["topk"],
                           "top_cell_type": s["top_cell_type"], "genes": s["genes"], "direction": direction,
                           "direction_label": "risk" if direction == 1 else "protective",
-                          "tcga_cindex": float(row["cindex"]), "analyses": []}
-        entries[k]["analyses"].append(analysis)
+                          "tcga_cindex": float(row["cindex"]), "tcga_keys": [], "analyses": []}
+        if key not in entries[k]["tcga_keys"]:
+            entries[k]["tcga_keys"].append(key)
+        if analysis not in entries[k]["analyses"]:
+            entries[k]["analyses"].append(analysis)
         entries[k].update(extra)
         return entries[k]["id"]
 
@@ -144,11 +146,12 @@ def freeze(ladder_json: Path, signatures_json: Path, scores_csv: Path, nulls_jso
             for key in (v or {}).get("argmax", []):
                 add(m, key, 1 if an == "primary" else direction_or[(m, key)], f"family_max_{an}")
     for name, v in lad.get("p3_corrected", {}).get("picks", {}).items():
-        if v["P3_pass"] or v.get("borderline"):
-            an, m = name.split("/")
-            e = next(e for e in entries.values() if e["id"] == picks[an][m])
-            e["analyses"].append(f"p3_lead_{an}")
-            e.setdefault("p3_subtypes", []).append(v["argmax_subtype"])
+        an, m = name.split("/")
+        if an != "sensitivity":
+            continue
+        e = next(e for e in entries.values() if e["id"] == picks[an][m])
+        e["analyses"].append(f"p3_lead_{an}")
+        e.setdefault("p3_subtypes", []).append(v["argmax_subtype"])
     prolif = json.load(open(nulls_json))["reference"]["proliferation"]
     out = list(entries.values())
     out.append({"id": "reference:proliferation", "model": "reference", "resolution": None,
@@ -167,13 +170,22 @@ def freeze(ladder_json: Path, signatures_json: Path, scores_csv: Path, nulls_jso
             "n_boot_margin": C.N_REPLICATE_BOOT,
             "seeds": {"floor": C.SEED_REPLICATE_FLOOR, "p3_perm": C.SEED_REPLICATE_PERM,
                       "margin_boot": C.SEED_REPLICATE_BOOT},
-            "p3_lead_rule": "picks whose within-subtype permutation test passed in TCGA (P3_corrected) or "
-                            "was borderline (p within 2 Monte-Carlo SE of 0.05), tested within the subtype "
-                            "where TCGA's maximum sat",
+            "p3_lead_rule": "every sensitivity-analysis pick, tested within the PAM50 subtype where its "
+                            "TCGA within-subtype C was highest, whatever its TCGA P3 result",
             "frozen_from": {"ladder.json": _sha(ladder_json),
                             "signatures.json": _sha(signatures_json), "scores.csv": _sha(scores_csv),
                             "nulls.json": _sha(nulls_json)},
             "signatures": out, "comparisons": comparisons}
+
+
+def _require_committed(frozen: Path) -> None:
+    """The replication runs only from a frozen spec that is committed and unmodified."""
+    import subprocess
+    git = ["git", "-C", str(frozen.parent)]
+    tracked = subprocess.run(git + ["ls-files", "--error-unmatch", frozen.name], capture_output=True)
+    dirty = subprocess.run(git + ["status", "--porcelain", "--", frozen.name], capture_output=True, text=True)
+    if tracked.returncode != 0 or dirty.stdout.strip():
+        raise SystemExit(f"{frozen} must be committed and unmodified before --real-outcomes")
 
 
 # ---- analysis ---------------------------------------------------------------------------------
@@ -324,6 +336,8 @@ def main(argv=None):
         print(f"  {len(spec['signatures'])} signatures frozen to {frozen}")
         return
 
+    if args.real_outcomes:
+        _require_committed(frozen)
     spec = json.load(open(frozen))
     out = Path(args.out_dir or C.RESULTS / ("replicate_shuffled" if args.shuffle_outcomes else "replicate"))
     out.mkdir(parents=True, exist_ok=True)
@@ -338,7 +352,10 @@ def main(argv=None):
            "criterion": CRITERION, "frozen_sha256": _sha(frozen),
            "n_patients_expression": int(zexpr.shape[1]), "n_genes": int(zexpr.shape[0]),
            "endpoints": {ep: {"n": int(usable(clin, c).sum()),
-                              "events": int(clin.loc[usable(clin, c), c].sum())}
+                              "events": int(clin.loc[usable(clin, c), c].sum()),
+                              "excluded_time_nonpositive": int((clin["time"] <= 0).sum()),
+                              "excluded_status_unknown": int((clin["time"] > 0).sum()
+                                                             - usable(clin, c).sum())}
                          for ep, c in ENDPOINTS.items()}, **res}
     json.dump(res, open(out / "metabric.json", "w"), indent=2)
     lines = summary_lines(res)

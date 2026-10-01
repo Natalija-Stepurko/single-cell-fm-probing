@@ -20,7 +20,7 @@
     "p3_perm": 54,
     "margin_boot": 55
   },
-  "p3_lead_rule": "picks whose within-subtype permutation test passed in TCGA (P3_corrected) or was borderline (p within 2 Monte-Carlo SE of 0.05), tested within the subtype where TCGA's maximum sat",
+  "p3_lead_rule": "every sensitivity-analysis pick, tested within the PAM50 subtype where its TCGA within-subtype C was highest, whatever its TCGA P3 result",
   "frozen_from": {
     "ladder.json": "43702a612373b7b07c370659a6f0d273f0dc5d20d055558c9c23339965323533",
     "signatures.json": "cfb8cef83b710c2c6396734e19168913ad3a9fd702ca327d3caf6253e30150b8",
@@ -90,6 +90,9 @@
       "direction": 1,
       "direction_label": "risk",
       "tcga_cindex": 0.5474366075824717,
+      "tcga_keys": [
+        "0.3/c21_k50"
+      ],
       "analyses": [
         "primary"
       ]
@@ -156,6 +159,9 @@
       "direction": 1,
       "direction_label": "risk",
       "tcga_cindex": 0.576101674052191,
+      "tcga_keys": [
+        "1.0/c11_k50"
+      ],
       "analyses": [
         "primary",
         "family_max_primary"
@@ -273,6 +279,9 @@
       "direction": 1,
       "direction_label": "risk",
       "tcga_cindex": 0.5464826440177253,
+      "tcga_keys": [
+        "0.3/c14_k100"
+      ],
       "analyses": [
         "primary"
       ]
@@ -389,6 +398,9 @@
       "direction": -1,
       "direction_label": "protective",
       "tcga_cindex": 0.4087580009847366,
+      "tcga_keys": [
+        "1.0/c17_k100"
+      ],
       "analyses": [
         "sensitivity",
         "p3_lead_sensitivity"
@@ -459,6 +471,9 @@
       "direction": -1,
       "direction_label": "protective",
       "tcga_cindex": 0.417051329394387,
+      "tcga_keys": [
+        "1.0/c8_k50"
+      ],
       "analyses": [
         "sensitivity",
         "p3_lead_sensitivity"
@@ -504,8 +519,15 @@
       "direction": -1,
       "direction_label": "protective",
       "tcga_cindex": 0.4217288281634663,
+      "tcga_keys": [
+        "1.0/c14_k25"
+      ],
       "analyses": [
-        "sensitivity"
+        "sensitivity",
+        "p3_lead_sensitivity"
+      ],
+      "p3_subtypes": [
+        "LumB"
       ]
     },
     {
@@ -570,6 +592,9 @@
       "direction": 1,
       "direction_label": "risk",
       "tcga_cindex": 0.5713780157557853,
+      "tcga_keys": [
+        "1.0/c50_k50"
+      ],
       "analyses": [
         "family_max_primary"
       ]
@@ -611,6 +636,9 @@
       "direction": 1,
       "direction_label": "risk",
       "tcga_cindex": 0.5568223781388478,
+      "tcga_keys": [
+        "0.5/c13_k25"
+      ],
       "analyses": [
         "family_max_primary"
       ]
@@ -677,138 +705,11 @@
       "direction": -1,
       "direction_label": "protective",
       "tcga_cindex": 0.3995568685376662,
-      "analyses": [
-        "family_max_sensitivity"
-      ]
-    },
-    {
-      "id": "hvg_pca:0.5/c21_k50:protective",
-      "model": "hvg_pca",
-      "resolution": "0.5",
-      "signature": "c21_k50",
-      "topk": 50,
-      "top_cell_type": "malignant cell",
-      "genes": [
-        "ASAH1",
-        "PKIB",
-        "PPDPF",
-        "RPS26",
-        "ESR1",
-        "GATA3",
-        "COX6C",
-        "SLC39A6",
-        "FSIP1",
-        "TFF3",
-        "DCXR",
-        "GABARAP",
-        "BCAM",
-        "ANKRD30A",
-        "SPDEF",
-        "FAM3B",
-        "MAGED2",
-        "NAT1",
-        "MLPH",
-        "EEF2",
-        "ABHD2",
-        "MRPS30",
-        "ANKRD50",
-        "GSTM1",
-        "C1orf43",
-        "EVL",
-        "GPX4",
-        "AR",
-        "TPRG1",
-        "CYB5A",
-        "CPB1",
-        "LYPLA1",
-        "GSTM3",
-        "AFF3",
-        "GRIA2",
-        "ATP6V1G1",
-        "QDPR",
-        "PHGR1",
-        "RABEP1",
-        "SRP9",
-        "CA2",
-        "RPLP0",
-        "SH3YL1",
-        "RPL14",
-        "XBP1",
-        "ENSA",
-        "AZGP1",
-        "PCM1",
-        "EEF1A1",
-        "ALCAM"
+      "tcga_keys": [
+        "0.3/c14_k50",
+        "0.5/c21_k50",
+        "1.0/c23_k50"
       ],
-      "direction": -1,
-      "direction_label": "protective",
-      "tcga_cindex": 0.3995568685376662,
-      "analyses": [
-        "family_max_sensitivity"
-      ]
-    },
-    {
-      "id": "hvg_pca:1.0/c23_k50:protective",
-      "model": "hvg_pca",
-      "resolution": "1.0",
-      "signature": "c23_k50",
-      "topk": 50,
-      "top_cell_type": "malignant cell",
-      "genes": [
-        "ASAH1",
-        "PKIB",
-        "PPDPF",
-        "RPS26",
-        "ESR1",
-        "GATA3",
-        "COX6C",
-        "SLC39A6",
-        "DCXR",
-        "FSIP1",
-        "TFF3",
-        "ANKRD30A",
-        "GABARAP",
-        "BCAM",
-        "SPDEF",
-        "MLPH",
-        "MAGED2",
-        "FAM3B",
-        "NAT1",
-        "EEF2",
-        "ABHD2",
-        "MRPS30",
-        "ANKRD50",
-        "C1orf43",
-        "GSTM1",
-        "GPX4",
-        "CPB1",
-        "AR",
-        "EVL",
-        "CYB5A",
-        "AFF3",
-        "TPRG1",
-        "GSTM3",
-        "LYPLA1",
-        "GRIA2",
-        "ATP6V1G1",
-        "QDPR",
-        "PHGR1",
-        "RABEP1",
-        "SH3YL1",
-        "CA2",
-        "SRP9",
-        "RPL14",
-        "AZGP1",
-        "RPLP0",
-        "ENSA",
-        "XBP1",
-        "PCM1",
-        "ALCAM",
-        "EEF1A1"
-      ],
-      "direction": -1,
-      "direction_label": "protective",
-      "tcga_cindex": 0.3995568685376662,
       "analyses": [
         "family_max_sensitivity"
       ]
@@ -875,6 +776,9 @@
       "direction": -1,
       "direction_label": "protective",
       "tcga_cindex": 0.4070808714918759,
+      "tcga_keys": [
+        "1.0/c5_k50"
+      ],
       "analyses": [
         "family_max_sensitivity"
       ]
@@ -991,6 +895,9 @@
       "direction": -1,
       "direction_label": "protective",
       "tcga_cindex": 0.409542712949286,
+      "tcga_keys": [
+        "1.0/c14_k100"
+      ],
       "analyses": [
         "family_max_sensitivity"
       ]
