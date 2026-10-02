@@ -1,6 +1,6 @@
 """Stage replicate — the frozen TCGA signatures in an independent cohort (METABRIC).
 
-Two steps, kept apart on purpose:
+Two separate steps:
 
   --freeze            write results/replicate/frozen_signatures.json from the TCGA outputs
                       (results/ladder/ladder.json, states/signatures.json, translate/scores.csv): every

@@ -387,7 +387,8 @@ DEVIATIONS = [
      "as_coded": "Within-subtype C of the one margin-selected FM signature above 0.6 in any subtype "
                  "with at least 10 events; no null, not computed for the baseline.",
      "now_reported": "Max over subtypes (Basal, Her2, LumA, LumB) of the within-subtype C, against "
-                     "1,000 within-subtype outcome permutations, for every representation including "
+                     f"{C.N_P3_PERM:,} within-subtype outcome permutations, for every representation "
+                     "including "
                      "the baseline; P3_corrected = p < 0.05. Pick and direction were fixed on the "
                      "full cohort, which contains these patients."},
     {"id": "monte_carlo_error",

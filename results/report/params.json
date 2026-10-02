@@ -1,17 +1,19 @@
 {
   "script": "report.py",
-  "timestamp_utc": "2026-10-01T16:11:02+00:00",
+  "timestamp_utc": "2026-10-02T10:53:26+00:00",
   "command": "src/scfm/stages/report.py",
   "args": {
     "data_dir": "data",
     "states_dir": "results/states",
     "translate_dir": "results/translate",
     "ladder_dir": "results/ladder",
+    "stratify_dir": "results/stratify",
+    "replicate_dir": "results/replicate",
     "out_dir": "results/report",
     "dry_run": false
   },
-  "git_commit": "e2a817ae29153e9fc8a56470899a8cfd8d575fb0",
-  "git_dirty": false,
+  "git_commit": "472a7c503affc02889ad3e756a1b164ebc7ebf46",
+  "git_dirty": true,
   "versions": {
     "python": "3.12.3",
     "numpy": "2.5.3",
@@ -36,6 +38,15 @@
     "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
   },
   "extra": {
-    "n_shortlisted": 0
+    "n_shortlisted": 0,
+    "figures": [
+      "fig_ladder",
+      "fig_states",
+      "fig_added_value",
+      "fig_stratify",
+      "fig_replication",
+      "fig_km",
+      "fig_margin"
+    ]
   }
 }

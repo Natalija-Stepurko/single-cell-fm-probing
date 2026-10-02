@@ -6,7 +6,7 @@
 #   make test lint    pytest and ruff
 #   make smoke        the whole pipeline on 2,000 cells with short control loops (~10 min; network)
 #   make all          the study, stages data -> report (hours on CPU; network)
-#   make reproduce    rebuild everything downstream of the tracked signatures, no models (~1.5 h)
+#   make reproduce    rebuild everything downstream of the tracked signatures, no models (~40 min)
 #   make verify       compare results/ with results/MANIFEST.sha256
 #   make page         rebuild docs/index.html from results/
 
@@ -38,10 +38,11 @@ all:
 # bulk cohort from the pinned Xena downloads, then translate -> ladder -> stratify -> report (and the PFI
 # translate -> ladder) from the tracked results/states; the atlas and the embeddings are not needed.
 # Regenerated outputs are removed first, so a file that is no longer written shows as missing in verify.
-REGENERATED := results/translate results/ladder results/stratify results/report results/translate_pfi \
-               results/ladder_pfi
+# fig_states.png is kept: it needs the per-cell UMAP files, which only a states run writes.
+REGENERATED := results/translate results/ladder results/stratify results/translate_pfi results/ladder_pfi
 reproduce:
 	rm -rf $(REGENERATED)
+	find results/report -type f ! -name fig_states.png -delete
 	$(RUN) scfm run data -- --skip-atlas
 	$(RUN) scfm run translate
 	$(RUN) scfm run ladder

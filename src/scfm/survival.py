@@ -18,7 +18,7 @@ def zscore_genes(expr: pd.DataFrame) -> pd.DataFrame:
 def score_signature(zexpr: pd.DataFrame, genes: list[str]) -> pd.Series:
     """Mean z-score of the signature genes present in the matrix, one value per patient.
 
-    Deliberately the simplest transparent scorer. ssGSEA is not implemented: it would add a
+    The simplest transparent scorer. ssGSEA is not implemented: it would add a
     tunable that the ladder would then have to sweep.
     """
     present = [g for g in genes if g in zexpr.index]
