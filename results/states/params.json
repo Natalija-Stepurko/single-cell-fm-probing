@@ -1,11 +1,11 @@
 {
-  "script": "03_states.py",
-  "timestamp_utc": "2026-09-29T17:06:17+00:00",
-  "command": "/data/scfm/scripts/03_states.py",
+  "script": "states.py",
+  "timestamp_utc": "2026-10-01T13:20:47+00:00",
+  "command": "src/scfm/stages/states.py",
   "args": {
-    "data_dir": "/data/scfm/data",
-    "emb_dir": "/data/scfm/results/embeddings",
-    "out_dir": "/data/scfm/results/states",
+    "data_dir": "data",
+    "emb_dir": "results/embeddings",
+    "out_dir": "results/states",
     "models": [
       "hvg_pca",
       "scgpt",
@@ -25,16 +25,30 @@
     "seed": 42,
     "dry_run": false
   },
-  "git_commit": "fa3449bfe9c72e917cbbdeed38a3774715b87821",
+  "git_commit": "00a00c7efb771c0eb02a0514b8a9fe2f7aab12da",
   "git_dirty": false,
   "versions": {
     "python": "3.12.3",
     "numpy": "2.5.3",
     "scipy": "1.18.1",
+    "pandas": "2.3.3",
     "sklearn": "1.9.1",
-    "torch": "2.14.0+cu130",
+    "scanpy": "1.12.4",
+    "anndata": "0.13.4",
+    "lifelines": "0.30.3",
+    "leidenalg": "0.12.0",
+    "igraph": "1.0.0",
+    "joblib": "1.6.0",
     "xgboost": "3.4.1",
-    "umap": "0.5.12"
+    "matplotlib": "3.11.2",
+    "torch": "2.14.0",
+    "transformers": "5.17.0",
+    "huggingface_hub": "1.33.0",
+    "cellxgene_census": "1.18.0"
+  },
+  "model_revisions": {
+    "scgpt": "a24c237737a40f3720f75abb555489e9fe753be6",
+    "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
   },
   "extra": {
     "hvg_pca": {
@@ -60,6 +74,8 @@
         "0.5": 22,
         "1.0": 33
       }
-    }
+    },
+    "universe_n": 16297,
+    "universe_n_hvg": 1526
   }
 }
