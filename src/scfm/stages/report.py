@@ -2,6 +2,8 @@
 
 Every number drawn is read from results/ (ladder, translate, states, stratify, replicate); the only
 quantities computed here are descriptive (Kaplan-Meier curves, numbers at risk, UMAP highlights).
+The family-wise p-values and null percentiles drawn are the 10,000-permutation ones (ladder.json
+family_wise_10k).
 
   fig_ladder.png       C of each representation's pick against its floor, its family-wise null and
                        three references; pre-specified (risk direction) and sensitivity (either)
@@ -11,6 +13,8 @@ quantities computed here are descriptive (Kaplan-Meier curves, numbers at risk, 
   fig_replication.png  the frozen signatures in TCGA and in METABRIC (OS, DSS, within subtype)
   fig_km.png           Kaplan-Meier by score tertile for the lead replicated signature
   fig_margin.png       foundation model minus baseline (P2, floor-adjusted), TCGA and METABRIC
+  fig_subtype.png      each pick's score by PAM50 subtype, TCGA and METABRIC (outcome-free)
+  fig_donor.png        donor mixing of every kept state, and its above-floor margin against it
   figures.json         what each figure shows, how to read it, and the files it read
 
 shortlist.md           FM signatures above their floor and the family-wise null
@@ -30,7 +34,7 @@ from scfm.provenance import record_params, relpath
 from scfm.survival import score_signature, zscore_genes
 
 FIGURES = ["fig_ladder", "fig_states", "fig_added_value", "fig_stratify", "fig_replication", "fig_km",
-           "fig_margin"]
+           "fig_margin", "fig_subtype", "fig_donor"]
 ANALYSIS_NAME = {"primary": "Pre-specified", "sensitivity": "Sensitivity (post hoc)"}
 
 # Programme of each pick, from its marker genes, donor and dataset composition. Each entry names the
@@ -61,6 +65,7 @@ def load(args) -> dict:
         "stratify": R["stratify"] / "cv_summary.json", "stratify_rows": R["stratify"] / "cv_results.csv",
         "metabric": R["replicate"] / "metabric.json", "frozen": R["replicate"] / "frozen_signatures.json",
         "clinical": R["data"] / "bulk_clinical.csv", "expression": R["data"] / "bulk_expr.parquet",
+        "subtype": R["ladder"] / "subtype_association.csv", "donor_mixing": R["ladder"] / "donor_mixing.json",
     }
     for m in S.MODELS:
         files[f"cells_{m}"] = R["states"] / f"cells_{m}.parquet"
@@ -74,6 +79,8 @@ def load(args) -> dict:
     D["strat"] = json.load(open(files["stratify"]))
     D["metabric"] = json.load(open(files["metabric"]))
     D["frozen"] = json.load(open(files["frozen"]))
+    D["subtype"] = pd.read_csv(files["subtype"])
+    D["donor_mixing"] = json.load(open(files["donor_mixing"]))
     return D
 
 
@@ -129,7 +136,7 @@ def fig_ladder(D, out):
     fig, axes = plt.subplots(2, 1, figsize=(S.WIDE, 5.6), sharex=True)
     fig.subplots_adjust(left=0.115, right=0.76, top=0.83, bottom=0.2, hspace=0.45)
     for ax, analysis in zip(axes, ("primary", "sensitivity")):
-        P = picks(L, analysis); fw = L["family_wise"][analysis]
+        P = picks(L, analysis); fw = L["family_wise_10k"][analysis]
         for i, m in enumerate(S.MODELS):
             r = P.loc[m]; y = -i
             ax.barh(y, r["cindex"] - 0.5, left=0.5, height=0.5, color=S.COL[m], zorder=2)
@@ -138,7 +145,7 @@ def fig_ladder(D, out):
                 ax.plot([e, e], [y - 0.09, y + 0.09], color=S.INK, lw=1.1, zorder=3)
             ax.plot([r["floor_mean"]] * 2, [y - 0.36, y + 0.36], color=S.INK, lw=1.3, ls=(0, (1, 1.6)),
                     zorder=4)
-            ax.plot([r["null_p95"]] * 2, [y - 0.36, y + 0.36], color=S.INK, lw=3.2, zorder=4,
+            ax.plot([fw[m]["null_p95"]] * 2, [y - 0.36, y + 0.36], color=S.INK, lw=3.2, zorder=4,
                     solid_capstyle="butt")
             ax.plot(fw[m]["stat"], y, marker="D", ms=6.5, mfc=S.SURFACE, mec=S.INK, mew=1.2, zorder=5)
             vals = [f"{r['cindex']:.3f}", fmt_p(fw[m]["pick_fw_p"]), f"{fw[m]['stat']:.3f}",
@@ -173,7 +180,8 @@ def fig_ladder(D, out):
                Line2D([], [], color=S.INK, lw=1.3, ls=(0, (1, 1.6)),
                       label="matched-random floor (mean of 200 random gene sets)"),
                Line2D([], [], color=S.INK, lw=3.2,
-                      label="family-wise null, 95th percentile (500 permutations)"),
+                      label=f"family-wise null, 95th percentile "
+                            f"({L['family_wise_10k']['n_perm']:,} permutations)"),
                Line2D([], [], color=S.INK, lw=0, marker="D", ms=6.5, mfc=S.SURFACE, mew=1.2,
                       label="largest C in the family (family max): the statistic the family-wise p tests"),
                Line2D([], [], color=S.COL["clinical"], lw=1.0, ls=(0, (4, 3)),
@@ -625,6 +633,148 @@ def fig_margin(D, out):
     return S.save(fig, out, "fig_margin")
 
 
+# ---- 8. subtype association -------------------------------------------------------------------
+SUBTYPE_ORDER = ["LumA", "LumB", "Her2", "Basal", "Normal"]
+SUBTYPE_LABEL = {"LumA": "LumA", "LumB": "LumB", "Her2": "HER2", "Basal": "Basal", "Normal": "Normal"}
+
+
+def _subtype_row(D, cohort: str, analysis: str, m: str, key: str) -> pd.Series:
+    A = D["subtype"]
+    hit = A[(A["cohort"] == cohort) & (A["model"] == m)
+            & A["analyses"].str.split(";").map(lambda xs: analysis in xs)]
+    if len(hit) != 1:
+        raise ValueError(f"subtype_association.csv: {len(hit)} {cohort} rows for {analysis}/{m}")
+    r = hit.iloc[0]
+    if f"{float(r['resolution']):.1f}/{r['signature']}" != key:
+        raise ValueError(f"subtype_association.csv: {analysis}/{m} is not the ladder pick {key}")
+    return r
+
+
+def fig_subtype(D, out):
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    L = D["L"]
+    fig, axes = plt.subplots(2, 3, figsize=(S.WIDE, 6.4), sharey=True)
+    fig.subplots_adjust(left=0.075, right=0.985, top=0.82, bottom=0.14, hspace=0.78, wspace=0.07)
+    x = np.arange(len(SUBTYPE_ORDER))
+    for i, analysis in enumerate(("primary", "sensitivity")):
+        P = picks(L, analysis)
+        for j, m in enumerate(S.MODELS):
+            ax = axes[i, j]; key = P.loc[m, "key"]; col = S.COL[m]
+            t = _subtype_row(D, "TCGA", analysis, m, key)
+            mb = _subtype_row(D, "METABRIC", analysis, m, key)
+            for r, dx, filled in ((t, -0.14, True), (mb, 0.14, False)):
+                med = [r[f"median_{g}"] for g in SUBTYPE_ORDER]
+                lo = [r[f"q25_{g}"] for g in SUBTYPE_ORDER]
+                hi = [r[f"q75_{g}"] for g in SUBTYPE_ORDER]
+                for xx, a, b in zip(x + dx, lo, hi):
+                    ax.plot([xx, xx], [a, b], color=col, lw=1.6, zorder=3)
+                ax.plot(x + dx, med, "o" if filled else "s", ms=6, mec=col, mfc=col if filled else S.SURFACE,
+                        mew=1.4, lw=0, zorder=4)
+            ax.axhline(0, color=S.MUTED, lw=0.7, zorder=1)
+            ax.set_xticks(x); ax.set_xticklabels([SUBTYPE_LABEL[g] for g in SUBTYPE_ORDER])
+            ax.set_xlim(-0.5, len(x) - 0.5)
+            S.clean(ax, left=(j == 0))
+            if j == 0:
+                ax.tick_params(axis="y", length=3, labelsize=S.FS_SMALL)
+                ax.set_ylabel("signature score (mean z)", fontsize=S.FS_SMALL)
+            ax.set_title(f"{S.NAME[m]} · {programme(analysis, m, key, D['sigs'])}", fontsize=S.FS, pad=30)
+            g = t["tracked_group"]
+            auc = t["auc_tracked"]
+            word = "higher" if auc >= 0.5 else "lower"
+            ax.text(0, 1.03, f"ε² {t['epsilon2']:.2f} TCGA, {mb['epsilon2']:.2f} METABRIC\n{word} in "
+                    f"{SUBTYPE_LABEL.get(g, g)} tumours (TCGA AUC {auc:.2f})", transform=ax.transAxes,
+                    fontsize=S.FS_SMALL, color=S.MUTED, va="bottom", linespacing=1.3)
+        fig.text(0.075, 0.975 if i == 0 else 0.515,
+                 "PRE-SPECIFIED PICKS" if i == 0 else "SENSITIVITY PICKS (POST HOC)",
+                 fontsize=S.FS_SMALL, color=S.MUTED, fontweight="bold", va="top")
+    n_t = int(_subtype_row(D, "TCGA", "primary", "scgpt", picks(L, "primary").loc["scgpt", "key"])["n"])
+    n_m = int(_subtype_row(D, "METABRIC", "primary", "scgpt", picks(L, "primary").loc["scgpt", "key"])["n"])
+    handles = [Line2D([], [], color=S.MUTED, marker="o", ms=6, mfc=S.MUTED, lw=1.6,
+                      label=f"TCGA-BRCA, PAM50 call ({n_t:,} patients): median, interquartile range"),
+               Line2D([], [], color=S.MUTED, marker="s", ms=6, mfc=S.SURFACE, mew=1.4, lw=1.6,
+                      label=f"METABRIC ({n_m:,} patients; claudin-low not shown)")]
+    fig.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.07, 0.0), ncol=2, fontsize=S.FS_SMALL,
+               borderaxespad=0.4)
+    return S.save(fig, out, "fig_subtype")
+
+
+# ---- 9. donor mixing --------------------------------------------------------------------------
+def fig_donor(D, out):
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from scfm.stages.donors import states_with_margins
+    d = states_with_margins(pd.read_csv(D["files"]["composition"]), D["scores"])
+    summ = {r["model"]: r for r in D["donor_mixing"]["per_representation"]}
+    marker = {"hvg_pca": "o", "scgpt": "s", "geneformer": "^"}
+    for m in S.MODELS:
+        g = d[d["model"] == m]
+        if len(g) != summ[m]["n_states"] or int((g["top_donor_frac"] >= C.SINGLE_DONOR_FRAC).sum()) != \
+                summ[m]["n_single_donor"]:
+            raise ValueError(f"donor mixing of {m}: the states drawn differ from donor_mixing.json")
+    fig = plt.figure(figsize=(S.WIDE, 4.8))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1, 1], left=0.14, right=0.975, top=0.8, bottom=0.25,
+                          wspace=0.36)
+    a0 = fig.add_subplot(gs[0]); a1 = fig.add_subplot(gs[1]); a2 = fig.add_subplot(gs[2], sharey=a1)
+    rng = np.random.default_rng(0)
+    for i, m in enumerate(S.MODELS):
+        g = d[d["model"] == m]; y = -i
+        a0.scatter(g["top_donor_frac"], y + rng.uniform(-0.22, 0.22, len(g)), s=11, color=S.COL[m],
+                   alpha=0.75, lw=0, marker=marker[m], zorder=3)
+    a0.set_yticks([0, -1, -2])
+    a0.set_yticklabels([f"{S.NAME[m]}\n{summ[m]['n_single_donor']} of {summ[m]['n_states']} single-donor\n"
+                        f"({summ[m]['share_single_donor']:.0%})" for m in S.MODELS], fontsize=S.FS_SMALL,
+                       linespacing=1.3)
+    a0.set_ylim(-2.55, 0.75); a0.set_xlim(0, 1.0)
+    a0.set_xlabel("share of the state's cells from its largest donor")
+    a0.set_title("Donor mixing of every kept state", fontsize=S.FS, pad=44)
+    for ax, col, title in ((a1, "above_floor", "Risk direction (pre-specified)"),
+                           (a2, "above_floor_or", "Either direction (post hoc)")):
+        for m in S.MODELS:
+            g = d[d["model"] == m]
+            ax.scatter(g["top_donor_frac"], g[col], s=13, color=S.COL[m], alpha=0.8, lw=0, marker=marker[m],
+                       zorder=3)
+            key = "best_margin_multi_donor" if col == "above_floor" else "best_margin_or_multi_donor"
+            multi = g[g["top_donor_frac"] < C.MULTI_DONOR_FRAC]
+            best = multi.loc[multi[col].idxmax()]
+            if abs(best[col] - summ[m][key]) > 1e-12:
+                raise ValueError(f"{m}: best multi-donor margin differs from donor_mixing.json")
+            ax.plot(best["top_donor_frac"], best[col], marker=marker[m], ms=9, mfc="none", mec=S.INK, mew=1.1,
+                    zorder=5)
+            ax.plot([0, C.MULTI_DONOR_FRAC], [best[col]] * 2, color=S.COL[m], lw=1.1, ls=(0, (3, 2)),
+                    zorder=2)
+        key = "best_margin_multi_donor" if col == "above_floor" else "best_margin_or_multi_donor"
+        v = {m: f"{summ[m][key]:+.3f}".replace("-", "\u2212") for m in S.MODELS}
+        best_txt = f"HVG-PCA {v['hvg_pca']} · scGPT {v['scgpt']}\nGeneformer {v['geneformer']}"
+        ax.text(0, 1.015, "best multi-donor state:\n" + best_txt, transform=ax.transAxes, fontsize=S.FS_SMALL,
+                color=S.MUTED, va="bottom", linespacing=1.3)
+        ax.axhline(0, color=S.MUTED, lw=0.7, zorder=1)
+        ax.set_xlim(0, 1.0)
+        ax.set_title(title, fontsize=S.FS, pad=44)
+        ax.set_xlabel("share from the largest donor")
+        S.clean(ax, left=True); ax.tick_params(axis="y", length=3, labelsize=S.FS_SMALL)
+        ax.yaxis.set_major_locator(plt.MultipleLocator(0.04))
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(signed))
+    a1.set_ylabel("C above the matched-random floor", fontsize=S.FS_SMALL)
+    for ax in (a0, a1, a2):
+        for v in (C.MULTI_DONOR_FRAC, C.SINGLE_DONOR_FRAC):
+            ax.axvline(v, color=S.RULE if ax is not a0 else S.MUTED, lw=0.8, ls=(0, (2, 2)), zorder=1)
+        ax.tick_params(axis="x", labelsize=S.FS_SMALL)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.0%}"))
+    S.clean(a0)
+    handles = [Line2D([], [], color=S.COL[m], marker=marker[m], lw=0, ms=6, label=S.NAME[m])
+               for m in S.MODELS]
+    handles += [Line2D([], [], color=S.MUTED, lw=1.1, ls=(0, (3, 2)), marker="o", ms=9, mfc="none", mec=S.INK,
+                       label=f"best multi-donor state (largest donor < {C.MULTI_DONOR_FRAC:.0%}) "
+                             "and its margin"),
+                Line2D([], [], color=S.MUTED, lw=0.8, ls=(0, (2, 2)),
+                       label=f"{C.MULTI_DONOR_FRAC:.0%} and {C.SINGLE_DONOR_FRAC:.0%} (single-donor) "
+                             "thresholds")]
+    fig.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.1, 0.0), ncol=3, fontsize=S.FS_SMALL,
+               borderaxespad=0.4, columnspacing=1.6)
+    return S.save(fig, out, "fig_donor")
+
+
 # ---- figures.json -----------------------------------------------------------------------------
 def describe(D, paths: dict, km: dict | None) -> list[dict]:
     f = {k: relpath(str(v)) for k, v in D["files"].items()}
@@ -638,10 +788,9 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                      "references",
             "question": "Does any representation's best cell state predict overall survival beyond chance "
                         "selection, and how far is it from routine clinical information?",
-            "shows": "Two panels sharing the C axis. Top: pre-specified analysis (risk direction), committed "
-                     "in the repository before any data were downloaded (commit 8d2c2d0; no external "
-                     "registry). Bottom: post hoc sensitivity analysis (either direction, C read in the "
-                     "direction the score acts). One row per representation.",
+            "shows": "Two panels sharing the C axis. Top: pre-specified analysis (risk direction). Bottom: "
+                     "post hoc sensitivity analysis (either direction, C read in the direction the score "
+                     "acts). One row per representation.",
             "how_to_read": [
                 "Bar: Harrell's C of the pick's score alone, unadjusted. Its whisker holds the pick fixed, "
                 "so it is optimistic.",
@@ -649,7 +798,8 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                 "tick; the family-wise p belongs to that maximum, which can be a different signature from "
                 "the pick.",
                 "Right columns: the pick's C and its own p against the same family-wise null, then the "
-                "family maximum's C and its family-wise p (bold when < 0.05)."],
+                "family maximum's C and its family-wise p (bold when < 0.05); p-values and the thick tick "
+                f"are from {L['family_wise_10k']['n_perm']:,} outcome permutations."],
             "data_files": [f["ladder"]]},
         "fig_states": {
             "title": "Where the picked states sit in each representation",
@@ -665,7 +815,7 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
             "data_files": [f[f"cells_{m}"] for m in S.MODELS] + [f["signatures"], f["composition"],
                                                                    f["ladder"]]},
         "fig_added_value": {
-            "title": "What each pick adds to age + stage",
+            "title": "Each pick added to a Cox model of age + stage",
             "question": "Does any pick add prognostic information to routine clinical variables?",
             "shows": "Forest plot, one row per pick (pre-specified, sensitivity) and the published "
                      "proliferation score. Left: Cox hazard ratio (HR) per standard deviation (SD) of the "
@@ -709,8 +859,7 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                      "the subtitle. Overall survival by tertile of the signature score (tertiles cut within "
                      "each panel), all patients and within the PAM50 subtype where its within-subtype C was "
                      "highest; numbers at risk below; curves stop at 8 years.",
-            "how_to_read": ["The statistics in the panel notes are read from ladder.json and metabric.json.",
-                            "Choice rule: a ladder pick that replicates on METABRIC OS, preferring one that "
+            "how_to_read": ["Choice rule: a ladder pick that replicates on METABRIC OS, preferring one that "
                             "passed P3 in TCGA, then the larger METABRIC OS margin over its floor."],
             "data_files": [f["ladder"], f["metabric"], f["frozen"], f["clinical"], f["expression"]]},
         "fig_margin": {
@@ -722,6 +871,33 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                      "patient bootstrap.",
             "how_to_read": ["P2 passes when the TCGA lower bound is above 0."],
             "data_files": [f["ladder"], f["metabric"], f["frozen"]]},
+        "fig_subtype": {
+            "title": "The picks' scores by PAM50 subtype, in TCGA and in METABRIC",
+            "question": "Do the picked states' bulk scores track the intrinsic subtypes?",
+            "shows": "One panel per pick: the median and interquartile range of the signature score in each "
+                     "PAM50 subtype, TCGA-BRCA (filled) and METABRIC (open). No outcomes are used. Above "
+                     "each panel: the rank-based effect size of subtype on the score (ε², Kruskal-Wallis "
+                     "H / (n − 1)) "
+                     "in both cohorts, and the one-vs-rest AUC of the TCGA subtype the score tracks most.",
+            "how_to_read": ["ε² near 0: the score does not differ by subtype; the published proliferation "
+                            "score, for comparison, has ε² above 0.5 in both cohorts.",
+                            "AUC: the probability that a tumour of that subtype scores higher than one of "
+                            "another subtype; below 0.5 means lower in that subtype."],
+            "data_files": [f["subtype"], f["ladder"], f["signatures"]]},
+        "fig_donor": {
+            "title": "Donor mixing of the states, and their survival signal",
+            "question": "Do the foundation models group cells across patients more than HVG-PCA, and are "
+                        "the better-mixed states more prognostic?",
+            "shows": "Left: the share of each kept state's cells that comes from its largest donor, per "
+                     "representation. Middle and right: each state's above-floor C margin (its 50-gene "
+                     "signature, TCGA overall survival) against that share, in the risk and in the either-"
+                     "direction reading; dashed lines mark the best multi-donor state of each "
+                     "representation.",
+            "how_to_read": ["A state is single-donor when one donor supplies at least 80% of its cells, and "
+                            "multi-donor when no donor supplies 50%.",
+                            "The three resolutions are pooled, so nested states appear more than once; the "
+                            "margins are selected on TCGA outcomes and carry no interval."],
+            "data_files": [f["composition"], f["scores"], f["donor_mixing"]]},
     }
     out = []
     from PIL import Image
@@ -743,9 +919,9 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
 # ---- text outputs -----------------------------------------------------------------------------
 def write_shortlist(D, out):
     L = D["L"]; scores = D["scores"]; sigs = D["sigs"]
-    ladder = pd.DataFrame(L["ladder"]).set_index("model")
     sl = scores[(scores["kind"] == "fm") & (scores["above_floor"] > 0)].copy()
-    sl = sl[sl.apply(lambda r: r["cindex"] > ladder.loc[r["model"], "null_p95"], axis=1)]
+    null95 = {m: v["null_p95"] for m, v in L["family_wise_10k"]["primary"].items()}
+    sl = sl[sl.apply(lambda r: r["cindex"] > null95[r["model"]], axis=1)]
     sl = sl.sort_values("above_floor", ascending=False).head(10)
     md = ["# Candidate cell states", "",
           f"Endpoint {L['endpoint']}, {L['n_patients']} patients, {L['n_events']} events. "
@@ -845,6 +1021,8 @@ def main(argv=None):
              "fig_replication": fig_replication(D, out)}
     paths["fig_km"], km = fig_km(D, out)
     paths["fig_margin"] = fig_margin(D, out)
+    paths["fig_subtype"] = fig_subtype(D, out)
+    paths["fig_donor"] = fig_donor(D, out)
     figs = describe(D, paths, km)
     (out / "figures.json").write_text(json.dumps({"figures": figs, "style": {
         "palette": {S.NAME.get(k, k): v for k, v in S.COL.items()}, "ink": S.INK, "muted": S.MUTED,

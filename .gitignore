@@ -30,6 +30,7 @@ results/*
 !results/stratify/
 !results/replicate/
 results/translate*/null_matrix_*.npz
+results/ladder*/null10k_*.npz
 results/states/cells_*.parquet
 smoke/
 data/

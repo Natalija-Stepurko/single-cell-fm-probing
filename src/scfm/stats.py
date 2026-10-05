@@ -54,11 +54,59 @@ def cindex_many(S, T, E, chunk: int = 64) -> np.ndarray:
     lifelines' concordance_index(T, -s, E) for each row, tied scores counting one half."""
     S = np.atleast_2d(np.asarray(S, dtype=float))
     I, J = comparable_pairs(T, E)
+    return _cindex_pairs(S, I, J, chunk)
+
+
+def _cindex_pairs(S, I, J, chunk: int = 64) -> np.ndarray:
     out = np.empty(len(S))
     for a in range(0, len(S), chunk):
         x, y = S[a:a + chunk][:, I], S[a:a + chunk][:, J]
         out[a:a + chunk] = ((x > y).sum(axis=1) + 0.5 * (x == y).sum(axis=1)) / len(I)
     return out
+
+
+def permuted_cindex(S, T, E, perms, chunk: int = 64) -> np.ndarray:
+    """C of every row of S against permuted outcomes, (n_perm, n_signatures): under permutation p,
+    patient i is scored against outcome p[i]. Equivalently outcome k is scored by patient
+    argsort(p)[k], so the comparable pairs are built once and the score columns are permuted."""
+    S = np.atleast_2d(np.asarray(S, dtype=float))
+    I, J = comparable_pairs(T, E)
+    out = np.empty((len(perms), len(S)))
+    for b, p in enumerate(perms):
+        q = np.argsort(p)
+        out[b] = _cindex_pairs(S, q[I], q[J], chunk)
+    return out
+
+
+def family_max_nulls(cmat) -> tuple[np.ndarray, np.ndarray]:
+    """Per permutation row of a (permutation x signature) C matrix: the family maximum of C and of
+    max(C, 1 - C)."""
+    cmat = np.asarray(cmat, dtype=float)
+    return cmat.max(axis=1), np.maximum(cmat, 1 - cmat).max(axis=1)
+
+
+def kruskal_eta2(values, groups) -> dict:
+    """Kruskal-Wallis H across groups with its p, and two rank-based effect sizes:
+    eta2_H = (H - k + 1) / (n - k) (Tomczak & Tomczak 2014) and epsilon2 = H / (n - 1)."""
+    from scipy.stats import kruskal
+    values, groups = np.asarray(values, dtype=float), np.asarray(groups)
+    levels = list(pd.unique(groups))
+    h, p = kruskal(*[values[groups == g] for g in levels])
+    n, k = len(values), len(levels)
+    return {"kw_h": float(h), "kw_p": float(p), "eta2_h": float((h - k + 1) / (n - k)),
+            "epsilon2": float(h / (n - 1)), "n": n, "n_levels": k}
+
+
+def auc_higher_in(score, in_group) -> float:
+    """One-vs-rest AUC: the probability that a member of the group scores higher than a non-member,
+    ties counting one half (0.5 = no separation; below 0.5 = lower in the group)."""
+    from scipy.stats import rankdata
+    score, g = np.asarray(score, dtype=float), np.asarray(in_group).astype(bool)
+    n1, n0 = int(g.sum()), int((~g).sum())
+    if n1 == 0 or n0 == 0:
+        return float("nan")
+    r = rankdata(score)
+    return float((r[g].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
 
 
 def best_above_floor(Cb: np.ndarray, floor: np.ndarray):

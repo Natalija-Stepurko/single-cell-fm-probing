@@ -20,13 +20,14 @@ STAGES = [
     ("data",      "assemble the single-cell atlas and the bulk cohort; harmonise genes"),
     ("embed",     "one embedding per cell for hvg_pca, scgpt, geneformer"),
     ("states",    "Leiden clusters per representation -> marker-gene signatures"),
+    ("stability", "clusters and picks under donor subsampling (needs the ladder; not part of 'all')"),
     ("translate", "score signatures in bulk; Cox; permutation null; matched-random floor; references"),
     ("ladder",    "assemble the ladder; patient bootstraps; test P1-P4, as coded and corrected"),
     ("stratify",  "cross-validated multivariable stratification: states vs age + stage"),
     ("report",    "figures, candidate shortlist, validation template"),
     ("replicate", "frozen signatures in METABRIC (run on its own; not part of 'all')"),
 ]
-NOT_IN_ALL = {"replicate"}
+NOT_IN_ALL = {"replicate", "stability"}
 SRC = Path(__file__).resolve().parents[1]
 
 

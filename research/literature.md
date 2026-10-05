@@ -45,8 +45,9 @@ corpora and models learn transferable cell biology. Geneformer V2 was trained on
 (Chen H et al. 2026); its model card lists V2-316M as the current default and a cancer-tuned V2-104M
 variant continually pretrained on about 14 million cancer transcriptomes. scGPT also releases a
 pan-cancer checkpoint (5.7 million cells) and a continually pretrained checkpoint for zero-shot cell
-embedding. A negative result here is a result about the light V1 Geneformer and whole-human scGPT
-checkpoints; the cancer-adapted variants were not tested.
+embedding. CancerFoundation is a single-cell foundation model trained on malignant cells only (Theus et
+al. 2024). A negative result here is a result about the light V1 Geneformer and whole-human scGPT
+checkpoints used zero-shot; the cancer-adapted variants and CancerFoundation were not tested.
 
 ## 2. From single-cell states to bulk outcomes (reverse translation)
 

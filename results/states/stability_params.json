@@ -1,18 +1,31 @@
 {
-  "script": "report.py",
-  "timestamp_utc": "2026-10-05T13:41:20+00:00",
-  "command": "src/scfm/stages/report.py",
+  "script": "stability.py",
+  "timestamp_utc": "2026-10-05T12:23:52+00:00",
+  "command": "src/scfm/stages/stability.py",
   "args": {
     "data_dir": "data",
+    "emb_dir": "results/embeddings",
     "states_dir": "results/states",
-    "translate_dir": "results/translate",
-    "ladder_dir": "results/ladder",
-    "stratify_dir": "results/stratify",
-    "replicate_dir": "results/replicate",
-    "out_dir": "results/report",
+    "ladder": "results/ladder/ladder.json",
+    "models": [
+      "hvg_pca",
+      "scgpt",
+      "geneformer"
+    ],
+    "resolutions": [
+      0.3,
+      0.5,
+      1.0
+    ],
+    "repeats": 20,
+    "keep_frac": 0.8,
+    "min_cells": 200,
+    "seed": 42,
+    "subset_seed": 62,
+    "n_jobs": 6,
     "dry_run": false
   },
-  "git_commit": "f6fce2c3f643696a091dc6b5546d53c356deb6a5",
+  "git_commit": "59a0d13a29d893ca0575b913141a6b1600b081e4",
   "git_dirty": true,
   "versions": {
     "python": "3.12.3",
@@ -38,17 +51,9 @@
     "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
   },
   "extra": {
-    "n_shortlisted": 0,
-    "figures": [
-      "fig_ladder",
-      "fig_states",
-      "fig_added_value",
-      "fig_stratify",
-      "fig_replication",
-      "fig_km",
-      "fig_margin",
-      "fig_subtype",
-      "fig_donor"
-    ]
+    "seconds": 1603.1,
+    "n_donors": 152,
+    "donors_kept_per_repeat": 122,
+    "ladder_source": "results/ladder/ladder.json"
   }
 }

@@ -8,11 +8,11 @@
       "display_width_px": 1140,
       "title": "The ladder: each representation's pick against its floor, its null and three references",
       "question": "Does any representation's best cell state predict overall survival beyond chance selection, and how far is it from routine clinical information?",
-      "shows": "Two panels sharing the C axis. Top: pre-specified analysis (risk direction), committed in the repository before any data were downloaded (commit 8d2c2d0; no external registry). Bottom: post hoc sensitivity analysis (either direction, C read in the direction the score acts). One row per representation.",
+      "shows": "Two panels sharing the C axis. Top: pre-specified analysis (risk direction). Bottom: post hoc sensitivity analysis (either direction, C read in the direction the score acts). One row per representation.",
       "how_to_read": [
         "Bar: Harrell's C of the pick's score alone, unadjusted. Its whisker holds the pick fixed, so it is optimistic.",
         "A family clears its null when its diamond (the family maximum) lies right of the thick tick; the family-wise p belongs to that maximum, which can be a different signature from the pick.",
-        "Right columns: the pick's C and its own p against the same family-wise null, then the family maximum's C and its family-wise p (bold when < 0.05)."
+        "Right columns: the pick's C and its own p against the same family-wise null, then the family maximum's C and its family-wise p (bold when < 0.05); p-values and the thick tick are from 10,000 outcome permutations."
       ],
       "data_files": [
         "results/ladder/ladder.json"
@@ -80,7 +80,7 @@
       "produced": true,
       "size": "wide",
       "display_width_px": 1140,
-      "title": "What each pick adds to age + stage",
+      "title": "Each pick added to a Cox model of age + stage",
       "question": "Does any pick add prognostic information to routine clinical variables?",
       "shows": "Forest plot, one row per pick (pre-specified, sensitivity) and the published proliferation score. Left: Cox hazard ratio (HR) per standard deviation (SD) of the score with its Wald 95% interval. Right: change in cross-validated C, with the signature re-selected inside every training fold (nested).",
       "how_to_read": [
@@ -154,7 +154,6 @@
       "question": "What does the lead replicated signature look like as survival curves, overall and within its subtype?",
       "shows": "Descriptive: the pick and its direction were chosen on these TCGA-BRCA patients, so the separation of the curves is optimistic; its replication is the METABRIC line in the subtitle. Overall survival by tertile of the signature score (tertiles cut within each panel), all patients and within the PAM50 subtype where its within-subtype C was highest; numbers at risk below; curves stop at 8 years.",
       "how_to_read": [
-        "The statistics in the panel notes are read from ladder.json and metabric.json.",
         "Choice rule: a ladder pick that replicates on METABRIC OS, preferring one that passed P3 in TCGA, then the larger METABRIC OS margin over its floor."
       ],
       "data_files": [
@@ -195,6 +194,52 @@
       "pixels": [
         2400,
         1008
+      ]
+    },
+    {
+      "name": "fig_subtype",
+      "file": "results/report/fig_subtype.png",
+      "produced": true,
+      "size": "wide",
+      "display_width_px": 1140,
+      "title": "The picks' scores by PAM50 subtype, in TCGA and in METABRIC",
+      "question": "Do the picked states' bulk scores track the intrinsic subtypes?",
+      "shows": "One panel per pick: the median and interquartile range of the signature score in each PAM50 subtype, TCGA-BRCA (filled) and METABRIC (open). No outcomes are used. Above each panel: the rank-based effect size of subtype on the score (\u03b5\u00b2, Kruskal-Wallis H / (n \u2212 1)) in both cohorts, and the one-vs-rest AUC of the TCGA subtype the score tracks most.",
+      "how_to_read": [
+        "\u03b5\u00b2 near 0: the score does not differ by subtype; the published proliferation score, for comparison, has \u03b5\u00b2 above 0.5 in both cohorts.",
+        "AUC: the probability that a tumour of that subtype scores higher than one of another subtype; below 0.5 means lower in that subtype."
+      ],
+      "data_files": [
+        "results/ladder/subtype_association.csv",
+        "results/ladder/ladder.json",
+        "results/states/signatures.json"
+      ],
+      "pixels": [
+        2400,
+        1536
+      ]
+    },
+    {
+      "name": "fig_donor",
+      "file": "results/report/fig_donor.png",
+      "produced": true,
+      "size": "wide",
+      "display_width_px": 1140,
+      "title": "Donor mixing of the states, and their survival signal",
+      "question": "Do the foundation models group cells across patients more than HVG-PCA, and are the better-mixed states more prognostic?",
+      "shows": "Left: the share of each kept state's cells that comes from its largest donor, per representation. Middle and right: each state's above-floor C margin (its 50-gene signature, TCGA overall survival) against that share, in the risk and in the either-direction reading; dashed lines mark the best multi-donor state of each representation.",
+      "how_to_read": [
+        "A state is single-donor when one donor supplies at least 80% of its cells, and multi-donor when no donor supplies 50%.",
+        "The three resolutions are pooled, so nested states appear more than once; the margins are selected on TCGA outcomes and carry no interval."
+      ],
+      "data_files": [
+        "results/states/state_composition.csv",
+        "results/translate/scores.csv",
+        "results/ladder/donor_mixing.json"
+      ],
+      "pixels": [
+        2400,
+        1152
       ]
     }
   ],

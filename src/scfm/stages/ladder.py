@@ -16,8 +16,12 @@ generator, so the pre-registered numbers do not move), the statistics the design
   P3  within-subtype C against within-subtype outcome permutations, for every representation
   P4  only when P2 passes: hypergeometric HVG depletion and a comparison with the baseline
 plus the ladder at every (resolution, top-k) setting (ladder_by_setting.csv), the value each pick
-adds to age and stage (added_value.csv), and a `deviations` list in ladder.json. A non-primary
-endpoint reads results/translate_<endpoint> and writes results/ladder_<endpoint>.
+adds to age and stage (added_value.csv), and a `deviations` list in ladder.json. The family-wise
+null is also rebuilt at 10,000 permutations on its own stream (family_wise_10k, the reported P1 p;
+the 500-permutation values stay). Secondary: the subtype association of every pick, outcome-free
+(subtype_association.csv/json, TCGA and METABRIC), and the donor mixing of the states
+(donor_mixing.csv/json). A non-primary endpoint reads results/translate_<endpoint> and writes
+results/ladder_<endpoint>.
 """
 import argparse
 import json
@@ -34,11 +38,13 @@ from scfm.stats import (
     cindex_many,
     cv_cox_cindex,
     cv_folds,
+    family_max_nulls,
     fw_pvalue,
     lrt_added,
     mc_annotate,
     orient,
     permute_within_strata,
+    permuted_cindex,
     selection_aware_margin,
 )
 from scfm.survival import bootstrap_patients, cindex, score_signature, zscore_genes
@@ -89,6 +95,44 @@ def family_wise(fam: pd.DataFrame, null, pick_c: float, col: str, af_col: str) -
             "n_perm": len(null),
             "P1_floor_condition": "every maximising signature above its floor",
             "P1_corrected": bool(p < C.ALPHA and all(v > 0 for v in af))}
+
+
+def _fw_chunk(S, T, E, perms):
+    return family_max_nulls(permuted_cindex(S, T, E, perms))
+
+
+def fw_nulls_large(S: dict, T, E, n_perm: int, seed: int, out: Path) -> dict:
+    """The family-wise null again at n_perm outcome permutations, on its own generator: one set of
+    permutations shared by every representation, C from the vectorised Harrell's C (checked against
+    lifelines on a sample of permutations and signatures). Saves null10k_<model>.npz per model."""
+    from joblib import Parallel, delayed
+    from lifelines.utils import concordance_index
+    rng = np.random.default_rng(seed)
+    perms = np.vstack([rng.permutation(len(T)) for _ in range(n_perm)]).astype(np.int32)
+    n_checked, worst = 0, 0.0
+    for Sm in S.values():
+        rows = np.unique(np.linspace(0, len(Sm) - 1, 4).astype(int))
+        pr = np.unique([0, n_perm // 2, n_perm - 1])
+        fast = permuted_cindex(Sm[rows], T, E, perms[pr])
+        for a, b in enumerate(pr):
+            p = perms[b]
+            for c, j in enumerate(rows):
+                ref = concordance_index(T[p], -Sm[j], E[p])
+                worst = max(worst, abs(fast[a, c] - ref))
+                n_checked += 1
+    assert worst < 1e-12, f"vectorised C differs from lifelines by {worst}"
+    par = Parallel(n_jobs=C.N_JOBS, max_nbytes=None)
+    parts = [p for p in np.array_split(np.arange(n_perm), C.N_JOBS) if len(p)]
+    nulls = {}
+    for m, Sm in S.items():
+        res = par(delayed(_fw_chunk)(Sm, T, E, perms[part]) for part in parts)
+        best = np.concatenate([r[0] for r in res])
+        best_or = np.concatenate([r[1] for r in res])
+        np.savez_compressed(out / f"null10k_{m}.npz", best_cindex_null=best, best_oriented_null=best_or)
+        nulls[m] = {"best_cindex_null": best, "best_oriented_null": best_or}
+        print(f"  {m}: {n_perm:,}-permutation family-wise null p95 = {np.percentile(best, 95):.3f} "
+              f"(either direction {np.percentile(best_or, 95):.3f})", flush=True)
+    return {"nulls": nulls, "check": {"n_checked": n_checked, "max_abs_diff_vs_lifelines": worst}}
 
 
 def _boot_chunk(S, T, E, idxs):
@@ -458,8 +502,47 @@ AS_CODED_P2 = ("P2_margin_as_coded: bootstrap mean of raw C(FM pick) - C(baselin
                "full-cohort point estimate")
 
 
+def family_wise_large(fams, fw500, nl: dict, best, best_or, n_perm: int) -> tuple[dict, dict]:
+    """family_wise at n_perm permutations, compared verdict by verdict with the 500-permutation one;
+    returns the block and the deviation record that states whether any P1 verdict moved."""
+    blk = {"n_perm": n_perm, "seed": C.SEED_FW_PERM,
+           "permutations": "one set of outcome permutations shared by every representation",
+           "statistic": "vectorised Harrell's C (scfm.stats.permuted_cindex), equal to lifelines",
+           "check": nl["check"],
+           "role": "the reported family-wise p for P1; family_wise keeps the pre-registered "
+                   "500-permutation values",
+           "primary": {}, "sensitivity": {}}
+    changed = []
+    for an, col, af, nk, pk in (
+            ("primary", "cindex", "above_floor", "best_cindex_null", best),
+            ("sensitivity", "cindex_or", "above_floor_or", "best_oriented_null", best_or)):
+        if pk is None:
+            continue
+        for m in fams:
+            null = nl["nulls"][m][nk]
+            r = family_wise(fams[m], null, pk.loc[m, col], col, af)
+            r.update(null_mean=float(np.mean(null)), null_p95=float(np.percentile(null, 95)),
+                     fw_p_500=fw500[an][m]["fw_p"], pick_fw_p_500=fw500[an][m]["pick_fw_p"],
+                     P1_corrected_500=fw500[an][m]["P1_corrected"])
+            blk[an][m] = r
+            if r["P1_corrected"] != r["P1_corrected_500"]:
+                changed.append(f"{an} {m}: P1_corrected {r['P1_corrected_500']} with 500, "
+                               f"{r['P1_corrected']} with {n_perm:,}")
+    blk["verdicts_changed"] = changed
+    now = (f"design: 500 permutations; reported: {n_perm:,} for Monte-Carlo precision; the 500-permutation "
+           "values are kept and ")
+    now += ("no verdict depends on the change" if not changed else
+            "these verdicts change: " + "; ".join(changed))
+    dev = {"id": "P1_permutations",
+           "design": "Family-wise permutation null with 500 outcome permutations.",
+           "as_coded": "500 permutations (family_wise, translate's stream); kept unchanged.",
+           "now_reported": now + f" (family_wise_10k, its own stream, seed {C.SEED_FW_PERM})."}
+    return blk, dev
+
+
 def corrected_analyses(scores, meta, sigs, clin, zexpr, ev, tm, best, best_or, P, P_or,
-                       translate_dir: Path, states_dir: Path, n_boot: int, out: Path) -> dict:
+                       translate_dir: Path, states_dir: Path, n_boot: int, out: Path,
+                       n_fw_perm: int = C.N_FW_PERM) -> dict:
     base = "hvg_pca"
     models = list(dict.fromkeys(scores["model"]))
     fms = [m for m in models if C.MODELS.get(m, {}).get("kind") == "fm"]
@@ -494,6 +577,10 @@ def corrected_analyses(scores, meta, sigs, clin, zexpr, ev, tm, best, best_or, P
         if best_or is not None:
             fw["sensitivity"][m] = family_wise(fams[m], nm.get("best_oriented_null"),
                                                best_or.loc[m, "cindex_or"], "cindex_or", "above_floor_or")
+
+    print(f"  family-wise null, {n_fw_perm:,} permutations …", flush=True)
+    nl = fw_nulls_large(S, T, E, n_fw_perm, C.SEED_FW_PERM, out)
+    fw_large, dev_large = family_wise_large(fams, fw, nl, best, best_or, n_fw_perm)
 
     print("  selection-aware bootstrap …", flush=True)
     Sall = np.vstack([S[m] for m in models])
@@ -577,14 +664,16 @@ def corrected_analyses(scores, meta, sigs, clin, zexpr, ev, tm, best, best_or, P
     av = added_value(items, fams, genes, clin, zexpr, ev, tm)
     av.to_csv(out / "added_value.csv", index=False)
 
-    return {"added_value": av, "reference": meta.get("reference", {}), "family_wise": fw, "p2_corrected": p2,
+    return {"added_value": av, "_items": items, "reference": meta.get("reference", {}), "family_wise": fw,
+            "family_wise_10k": fw_large, "p2_corrected": p2,
             "p3_corrected": p3, "p4_corrected": p4, "verdicts": verdicts, "universe": universe,
             "monte_carlo": {"p2_bootstrap_resamples": C.N_P2_BOOT, "p3_permutations": C.N_P3_PERM,
                             "borderline": "a permutation p within 2 Monte-Carlo SE of alpha"},
             "seeds": {"p2_bootstrap": C.SEED_P2_BOOT, "p3_permutations": C.SEED_P3_PERM,
                       "added_value_cv": C.SEED_ADDED_VALUE, "reference_cv": C.SEED_REF_CV,
                       "reference_floor": C.SEED_REF_FLOOR, "reference_perm": C.SEED_REF_PERM},
-            "deviations": [{k: v.format(family_sizes=sizes) for k, v in dv.items()} for dv in DEVIATIONS]}
+            "deviations": [{k: v.format(family_sizes=sizes) for k, v in dv.items()} for dv in DEVIATIONS]
+            + [dev_large]}
 
 
 def corrected_summary(corr: dict, av: pd.DataFrame | None = None) -> list[str]:
@@ -609,6 +698,12 @@ def corrected_summary(corr: dict, av: pd.DataFrame | None = None) -> list[str]:
                              f"fw p={v['fw_p']:.3f} (MC se {v['fw_p_mc_se']:.3f}"
                              f"{', borderline' if v['fw_p_borderline'] else ''}); "
                              f"pick p={v['pick_fw_p']:.3f}; P1_corrected={v['P1_corrected']}")
+        for m, v in corr.get("family_wise_10k", {}).get(an, {}).items():
+            lines.append(f"  {an:<11} {m:<11} {v['n_perm']:,} perms: fw p={v['fw_p']:.4f} "
+                         f"(MC se {v['fw_p_mc_se']:.4f}{', borderline' if v['fw_p_borderline'] else ''}); "
+                         f"pick p={v['pick_fw_p']:.4f}; "
+                         f"null mean {v['null_mean']:.3f} p95 {v['null_p95']:.3f}; "
+                         f"P1_corrected={v['P1_corrected']}")
         for m, v in corr["p2_corrected"][an].items():
             lines.append(f"  {an:<11} {m:<11} P2 above-floor margin {v['margin']:+.3f} "
                          f"[{v['ci'][0]:+.3f},{v['ci'][1]:+.3f}] (selection-aware, B={v['n_boot']}) "
@@ -627,6 +722,24 @@ def corrected_summary(corr: dict, av: pd.DataFrame | None = None) -> list[str]:
     return lines
 
 
+def secondary_analyses(items, scores, clin, zexpr, av, states_dir: Path, metabric_dir: Path,
+                       out: Path) -> list[str]:
+    """Subtype association of the picks (outcome-free) and donor mixing of the states."""
+    from scfm.stages import donors, subtype
+    print("  subtype association …", flush=True)
+    sa, sa_json = subtype.subtype_association(items, zexpr, clin, av, metabric_dir)
+    sa.to_csv(out / "subtype_association.csv", index=False)
+    json.dump(sa_json, open(out / "subtype_association.json", "w"), indent=2, default=_json_default)
+    lines = subtype.summary_lines(sa)
+    comp = states_dir / "state_composition.csv"
+    if comp.exists():
+        dm, dm_json = donors.donor_mixing(comp, scores)
+        dm.to_csv(out / "donor_mixing.csv", index=False)
+        json.dump(dm_json, open(out / "donor_mixing.json", "w"), indent=2, default=_json_default)
+        lines += donors.summary_lines(dm)
+    return lines
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default=str(C.DATA))
@@ -638,6 +751,9 @@ def main(argv=None):
     ap.add_argument("--out-dir", default=None)
     ap.add_argument("--n-boot", type=int, default=C.N_BOOTSTRAP)
     ap.add_argument("--seed", type=int, default=C.SEED)
+    ap.add_argument("--n-fw-perm", type=int, default=C.N_FW_PERM)
+    ap.add_argument("--metabric-dir", default=str(C.DATA / "raw" / "metabric"),
+                    help="METABRIC files for the outcome-free subtype association (skipped if absent)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
     args.translate_dir = args.translate_dir or str(
@@ -754,8 +870,10 @@ def main(argv=None):
     ladder.to_csv(out / "ladder.csv")
     corr = corrected_analyses(scores, meta, sigs, clin, zexpr, ev, tm, best,
                               best_or if sens_ladder is not None else None, P, P_or,
-                              Path(args.translate_dir), Path(args.states_dir), args.n_boot, out)
+                              Path(args.translate_dir), Path(args.states_dir), args.n_boot, out,
+                              args.n_fw_perm)
     av = corr.pop("added_value")
+    items = corr.pop("_items")
     json.dump({"ladder": ladder.reset_index().to_dict("records"), "reference_pam50": ref,
                "predictions": P, "endpoint": meta["endpoint"],
                "sensitivity": None if sens_ladder is None else {
@@ -789,6 +907,8 @@ def main(argv=None):
                          f"[{p['P2_margin_ci'][0]:+.3f},{p['P2_margin_ci'][1]:+.3f}]) "
                          f"P3={p['P3_pass']} P4={p['P4_pass']}")
     lines += corrected_summary(corr, av)
+    lines += secondary_analyses(items, scores, clin, zexpr, av, Path(args.states_dir),
+                                Path(args.metabric_dir), out)
     (out / "summary.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     record_params(out, args, extra={"predictions": P, "verdicts": corr["verdicts"]})
