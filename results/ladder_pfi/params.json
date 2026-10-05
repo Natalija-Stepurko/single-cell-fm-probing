@@ -1,0 +1,134 @@
+{
+  "script": "ladder.py",
+  "timestamp_utc": "2026-10-02T10:52:57+00:00",
+  "command": "src/scfm/stages/ladder.py --endpoint PFI",
+  "args": {
+    "data_dir": "data",
+    "states_dir": "results/states",
+    "endpoint": "PFI",
+    "translate_dir": "results/translate_pfi",
+    "out_dir": "results/ladder_pfi",
+    "n_boot": 200,
+    "seed": 42,
+    "dry_run": false
+  },
+  "git_commit": "472a7c503affc02889ad3e756a1b164ebc7ebf46",
+  "git_dirty": true,
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "pandas": "2.3.3",
+    "sklearn": "1.9.1",
+    "scanpy": "1.12.4",
+    "anndata": "0.13.4",
+    "lifelines": "0.30.3",
+    "leidenalg": "0.12.0",
+    "igraph": "1.0.0",
+    "joblib": "1.6.0",
+    "xgboost": "3.4.1",
+    "matplotlib": "3.11.2",
+    "torch": "2.14.0",
+    "transformers": "5.17.0",
+    "huggingface_hub": "1.33.0",
+    "cellxgene_census": "1.18.0"
+  },
+  "model_revisions": {
+    "scgpt": "a24c237737a40f3720f75abb555489e9fe753be6",
+    "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
+  },
+  "extra": {
+    "predictions": {
+      "geneformer": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": -0.004235007201708199,
+        "P2_margin_ci": [
+          -0.008268015244612948,
+          -0.00031233136203368976
+        ],
+        "P2_pass": false,
+        "P4_hvg_frac": 0.21,
+        "P4_pass": true,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.498001998001998,
+          "Her2": 0.42105263157894735,
+          "LumA": 0.4082174328484977,
+          "LumB": 0.6191500806885423
+        },
+        "P3_pass": true
+      },
+      "scgpt": {
+        "P1_above_floor": false,
+        "P2_margin_over_baseline": -0.005427461370194523,
+        "P2_margin_ci": [
+          -0.009170259367266948,
+          -0.0019387776173012455
+        ],
+        "P2_pass": false,
+        "P4_hvg_frac": 0.21,
+        "P4_pass": true,
+        "P3_within_subtype_cindex": {
+          "Basal": 0.5004995004995005,
+          "Her2": 0.4116541353383459,
+          "LumA": 0.4056693916551651,
+          "LumB": 0.6186121570736955
+        },
+        "P3_pass": true
+      }
+    },
+    "verdicts": {
+      "primary": {
+        "scgpt": {
+          "P1_as_coded": false,
+          "P1_corrected": false,
+          "P1_corrected_borderline": false,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": true,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        },
+        "geneformer": {
+          "P1_as_coded": false,
+          "P1_corrected": false,
+          "P1_corrected_borderline": false,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": true,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        }
+      },
+      "sensitivity": {
+        "scgpt": {
+          "P1_as_coded": true,
+          "P1_corrected": true,
+          "P1_corrected_borderline": false,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": true,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        },
+        "geneformer": {
+          "P1_as_coded": false,
+          "P1_corrected": true,
+          "P1_corrected_borderline": true,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": true,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        }
+      }
+    }
+  }
+}

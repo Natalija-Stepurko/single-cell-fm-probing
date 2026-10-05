@@ -1,0 +1,50 @@
+{
+  "definition": "cells whose raw count vector (layers['counts']) is identical to that of another atlas cell; not removed from the analysis",
+  "n_cells": 50002,
+  "n_groups": 577,
+  "group_sizes": {
+    "2": 577
+  },
+  "n_redundant_cells": 577,
+  "n_cells_in_groups": 1154,
+  "n_unique_cells": 49425,
+  "all_groups_same_donor": true,
+  "all_groups_across_datasets": true,
+  "dataset_pairs": {
+    "de5416ef + ed880090": 343,
+    "5a9cfb44 + de5416ef": 193,
+    "75011e96 + de5416ef": 41
+  },
+  "picks": {
+    "primary/hvg_pca": {
+      "pick": "0.3/c21_k50",
+      "n_cells": 284,
+      "n_cells_with_duplicate": 0
+    },
+    "primary/scgpt": {
+      "pick": "1.0/c11_k50",
+      "n_cells": 735,
+      "n_cells_with_duplicate": 27
+    },
+    "primary/geneformer": {
+      "pick": "0.3/c14_k100",
+      "n_cells": 1657,
+      "n_cells_with_duplicate": 78
+    },
+    "sensitivity/hvg_pca": {
+      "pick": "1.0/c17_k100",
+      "n_cells": 444,
+      "n_cells_with_duplicate": 22
+    },
+    "sensitivity/scgpt": {
+      "pick": "1.0/c8_k50",
+      "n_cells": 1083,
+      "n_cells_with_duplicate": 57
+    },
+    "sensitivity/geneformer": {
+      "pick": "1.0/c14_k25",
+      "n_cells": 854,
+      "n_cells_with_duplicate": 2
+    }
+  }
+}

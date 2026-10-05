@@ -1,0 +1,821 @@
+{
+  "outcomes": "real",
+  "criterion": "A signature replicates on an endpoint if its oriented C exceeds its METABRIC floor p95 AND its age-adjusted, cohort-stratified HR is in the TCGA direction with p < 0.05.",
+  "frozen_sha256": "20ad0b4a23f458a9e4b1eeb4e708bc361e2b282a66514884b4ea8fb79bf3781b",
+  "n_patients_expression": 1980,
+  "n_genes": 20384,
+  "endpoints": {
+    "OS": {
+      "n": 1979,
+      "events": 1143,
+      "excluded_time_nonpositive": 1,
+      "excluded_status_unknown": 0
+    },
+    "DSS": {
+      "n": 1978,
+      "events": 646,
+      "excluded_time_nonpositive": 1,
+      "excluded_status_unknown": 1
+    }
+  },
+  "signatures": [
+    {
+      "id": "hvg_pca:0.3/c21_k50",
+      "model": "hvg_pca",
+      "analyses": [
+        "primary"
+      ],
+      "n_genes": 50,
+      "n_genes_measured": 49,
+      "coverage": 0.98,
+      "genes_missing": [
+        "LINGO3"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.5716769946926794,
+          "cindex_oriented": 0.5716769946926794,
+          "floor_mean": 0.5132610186200967,
+          "floor_p95": 0.5510236605686839,
+          "above_floor": 0.058415976072582754,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.1416054954975894,
+          "hr_ci": [
+            1.0749512763065976,
+            1.2123927252109055
+          ],
+          "p": 1.5987374520411064e-05,
+          "replicates": true
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.5915377237561025,
+          "cindex_oriented": 0.5915377237561025,
+          "floor_mean": 0.5160075217960489,
+          "floor_p95": 0.5692564910861204,
+          "above_floor": 0.07553020196005356,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.2593528200577773,
+          "hr_ci": [
+            1.1650851733090923,
+            1.361247711086205
+          ],
+          "p": 6.283915326682598e-09,
+          "replicates": true
+        }
+      }
+    },
+    {
+      "id": "scgpt:1.0/c11_k50",
+      "model": "scgpt",
+      "analyses": [
+        "primary",
+        "family_max_primary"
+      ],
+      "n_genes": 50,
+      "n_genes_measured": 49,
+      "coverage": 0.98,
+      "genes_missing": [
+        "NDUFA6"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.5428180686097193,
+          "cindex_oriented": 0.5428180686097193,
+          "floor_mean": 0.5077614485427105,
+          "floor_p95": 0.543445125567053,
+          "above_floor": 0.035056620067008715,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.1858089236406406,
+          "hr_ci": [
+            1.1111615910122727,
+            1.2654710302799188
+          ],
+          "p": 2.786245961935642e-07,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.5595573061083484,
+          "cindex_oriented": 0.5595573061083484,
+          "floor_mean": 0.5056991383855923,
+          "floor_p95": 0.5611663840832023,
+          "above_floor": 0.05385816772275609,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.2620173540764605,
+          "hr_ci": [
+            1.1574977738348842,
+            1.3759748294922818
+          ],
+          "p": 1.3210845832465995e-07,
+          "replicates": false
+        }
+      }
+    },
+    {
+      "id": "geneformer:0.3/c14_k100",
+      "model": "geneformer",
+      "analyses": [
+        "primary"
+      ],
+      "n_genes": 100,
+      "n_genes_measured": 98,
+      "coverage": 0.98,
+      "genes_missing": [
+        "SLC25A6",
+        "NDUFA6"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.5345257508820827,
+          "cindex_oriented": 0.5345257508820827,
+          "floor_mean": 0.513155094582975,
+          "floor_p95": 0.5460622424170546,
+          "above_floor": 0.021370656299107615,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.1694854270666057,
+          "hr_ci": [
+            1.0997297943330304,
+            1.2436656451148058
+          ],
+          "p": 6.049221168881847e-07,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.5730088093311636,
+          "cindex_oriented": 0.5730088093311636,
+          "floor_mean": 0.5136886915097685,
+          "floor_p95": 0.571529621262398,
+          "above_floor": 0.059320117821395124,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.227294933451932,
+          "hr_ci": [
+            1.1328673627093686,
+            1.3295932986139032
+          ],
+          "p": 5.330550242898094e-07,
+          "replicates": true
+        }
+      }
+    },
+    {
+      "id": "hvg_pca:1.0/c17_k100:protective",
+      "model": "hvg_pca",
+      "analyses": [
+        "sensitivity",
+        "p3_lead_sensitivity"
+      ],
+      "n_genes": 100,
+      "n_genes_measured": 98,
+      "coverage": 0.98,
+      "genes_missing": [
+        "MALAT1",
+        "TSTD1"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.44528789990215556,
+          "cindex_oriented": 0.5547121000978444,
+          "floor_mean": 0.4878819195303466,
+          "floor_p95": 0.5272906721617695,
+          "above_floor": 0.06683018056749784,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.1012785344558755,
+          "hr_ci": [
+            1.0382875483959644,
+            1.168091067187448
+          ],
+          "p": 0.0013261467979383962,
+          "replicates": true
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.40608834786403264,
+          "cindex_oriented": 0.5939116521359673,
+          "floor_mean": 0.4879480235824613,
+          "floor_p95": 0.5456385742338427,
+          "above_floor": 0.105963628553506,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.2027987036842345,
+          "hr_ci": [
+            1.1173071810487987,
+            1.2948316686074253
+          ],
+          "p": 9.172665039816352e-07,
+          "replicates": true
+        }
+      },
+      "p3": {
+        "LumA": {
+          "OS": {
+            "n": 700,
+            "events": 378,
+            "cindex_oriented": 0.5754947698605739,
+            "perm_p": 0.000999000999000999,
+            "n_perm": 1000
+          },
+          "DSS": {
+            "n": 699,
+            "events": 153,
+            "cindex_oriented": 0.6010744881661101,
+            "perm_p": 0.000999000999000999,
+            "n_perm": 1000
+          }
+        }
+      }
+    },
+    {
+      "id": "scgpt:1.0/c8_k50:protective",
+      "model": "scgpt",
+      "analyses": [
+        "sensitivity",
+        "p3_lead_sensitivity"
+      ],
+      "n_genes": 50,
+      "n_genes_measured": 49,
+      "coverage": 0.98,
+      "genes_missing": [
+        "MALAT1"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.4712292821774839,
+          "cindex_oriented": 0.5287707178225161,
+          "floor_mean": 0.4885257471758531,
+          "floor_p95": 0.5210260696178135,
+          "above_floor": 0.040244970646662936,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.0121263305693275,
+          "hr_ci": [
+            0.9510640133884439,
+            1.077109105812981
+          ],
+          "p": 0.7042097033359516,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.4561306217442294,
+          "cindex_oriented": 0.5438693782557706,
+          "floor_mean": 0.4883198405411056,
+          "floor_p95": 0.5448059378892152,
+          "above_floor": 0.05554953771466503,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.060017155563591,
+          "hr_ci": [
+            0.9784165242309739,
+            1.1484233373637003
+          ],
+          "p": 0.15384276908535088,
+          "replicates": false
+        }
+      },
+      "p3": {
+        "LumA": {
+          "OS": {
+            "n": 700,
+            "events": 378,
+            "cindex_oriented": 0.561585390167072,
+            "perm_p": 0.000999000999000999,
+            "n_perm": 1000
+          },
+          "DSS": {
+            "n": 699,
+            "events": 153,
+            "cindex_oriented": 0.5642950486423697,
+            "perm_p": 0.007992007992007992,
+            "n_perm": 1000
+          }
+        }
+      }
+    },
+    {
+      "id": "geneformer:1.0/c14_k25:protective",
+      "model": "geneformer",
+      "analyses": [
+        "sensitivity",
+        "p3_lead_sensitivity"
+      ],
+      "n_genes": 25,
+      "n_genes_measured": 22,
+      "coverage": 0.88,
+      "genes_missing": [
+        "MALAT1",
+        "GAS5",
+        "SNHG6"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.4933969816467519,
+          "cindex_oriented": 0.5066030183532482,
+          "floor_mean": 0.4939891963412103,
+          "floor_p95": 0.5334097310759925,
+          "above_floor": 0.012613822012037867,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.0010852729973048,
+          "hr_ci": [
+            0.9404779723370312,
+            1.0655982950049872
+          ],
+          "p": 0.9728441623156306,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.4676775275689337,
+          "cindex_oriented": 0.5323224724310662,
+          "floor_mean": 0.4932040930661745,
+          "floor_p95": 0.5576287307835668,
+          "above_floor": 0.03911837936489171,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.072256443916533,
+          "hr_ci": [
+            0.987400120988029,
+            1.1644052467504895
+          ],
+          "p": 0.09721158145649196,
+          "replicates": false
+        }
+      },
+      "p3": {
+        "LumB": {
+          "OS": {
+            "n": 475,
+            "events": 315,
+            "cindex_oriented": 0.4899946853987106,
+            "perm_p": 0.7102897102897103,
+            "n_perm": 1000
+          },
+          "DSS": {
+            "n": 475,
+            "events": 188,
+            "cindex_oriented": 0.5020954558049321,
+            "perm_p": 0.46653346653346656,
+            "n_perm": 1000
+          }
+        }
+      }
+    },
+    {
+      "id": "hvg_pca:1.0/c50_k50",
+      "model": "hvg_pca",
+      "analyses": [
+        "family_max_primary"
+      ],
+      "n_genes": 50,
+      "n_genes_measured": 47,
+      "coverage": 0.94,
+      "genes_missing": [
+        "CISD3",
+        "NDUFB9",
+        "NDUFA6"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.5453546120319033,
+          "cindex_oriented": 0.5453546120319033,
+          "floor_mean": 0.5075249355116079,
+          "floor_p95": 0.5443232425060041,
+          "above_floor": 0.03782967652029534,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.2070868148473903,
+          "hr_ci": [
+            1.1368177087997635,
+            1.28169940290318
+          ],
+          "p": 7.727089743583927e-10,
+          "replicates": true
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.5719201432766348,
+          "cindex_oriented": 0.5719201432766348,
+          "floor_mean": 0.5053060878933062,
+          "floor_p95": 0.5618790739747448,
+          "above_floor": 0.06661405538332854,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.2894895026803435,
+          "hr_ci": [
+            1.1933483339133641,
+            1.393376208998433
+          ],
+          "p": 1.2656769564746777e-10,
+          "replicates": true
+        }
+      }
+    },
+    {
+      "id": "geneformer:0.5/c13_k25",
+      "model": "geneformer",
+      "analyses": [
+        "family_max_primary"
+      ],
+      "n_genes": 25,
+      "n_genes_measured": 25,
+      "coverage": 1.0,
+      "genes_missing": [],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.5425430663859816,
+          "cindex_oriented": 0.5425430663859816,
+          "floor_mean": 0.5082687053399354,
+          "floor_p95": 0.5469808313813859,
+          "above_floor": 0.0342743610460462,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.1208968582960028,
+          "hr_ci": [
+            1.0463524517212905,
+            1.2007519692537694
+          ],
+          "p": 0.0011524202184743967,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.5413624917043192,
+          "cindex_oriented": 0.5413624917043192,
+          "floor_mean": 0.5096168588688783,
+          "floor_p95": 0.5738454230569925,
+          "above_floor": 0.03174563283544085,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.148791152919325,
+          "hr_ci": [
+            1.04964811576211,
+            1.257298606273887
+          ],
+          "p": 0.0025935972452724755,
+          "replicates": false
+        }
+      }
+    },
+    {
+      "id": "hvg_pca:0.3/c14_k50:protective",
+      "model": "hvg_pca",
+      "analyses": [
+        "family_max_sensitivity"
+      ],
+      "n_genes": 50,
+      "n_genes_measured": 50,
+      "coverage": 1.0,
+      "genes_missing": [],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.44990215554303675,
+          "cindex_oriented": 0.5500978444569633,
+          "floor_mean": 0.4921971232247161,
+          "floor_p95": 0.5301016618732766,
+          "above_floor": 0.05790072123224721,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.1544532365023,
+          "hr_ci": [
+            1.0868330308889342,
+            1.2262806129296167
+          ],
+          "p": 3.1037749749240857e-06,
+          "replicates": true
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.39765289053337816,
+          "cindex_oriented": 0.6023471094666218,
+          "floor_mean": 0.4944886337809213,
+          "floor_p95": 0.5585204596488995,
+          "above_floor": 0.10785847568570056,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.2588441001662245,
+          "hr_ci": [
+            1.1663372266752312,
+            1.3586880640349919
+          ],
+          "p": 3.3974402879849376e-09,
+          "replicates": true
+        }
+      }
+    },
+    {
+      "id": "scgpt:1.0/c5_k50:protective",
+      "model": "scgpt",
+      "analyses": [
+        "family_max_sensitivity"
+      ],
+      "n_genes": 50,
+      "n_genes_measured": 45,
+      "coverage": 0.9,
+      "genes_missing": [
+        "MALAT1",
+        "GAS5",
+        "SNHG6",
+        "GOLGA8A",
+        "SNHG1"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.472837044504403,
+          "cindex_oriented": 0.527162955495597,
+          "floor_mean": 0.48667928514246755,
+          "floor_p95": 0.5249606769057431,
+          "above_floor": 0.04048367035312944,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.056342619822218,
+          "hr_ci": [
+            0.9916040887711502,
+            1.1253077141258072
+          ],
+          "p": 0.08938105778081838,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.4457530659927089,
+          "cindex_oriented": 0.5542469340072911,
+          "floor_mean": 0.4845186061892596,
+          "floor_p95": 0.5471983895015318,
+          "above_floor": 0.06972832781803145,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.1733488591037908,
+          "hr_ci": [
+            1.0795669460072026,
+            1.2752776011270932
+          ],
+          "p": 0.00016903244022212772,
+          "replicates": true
+        }
+      }
+    },
+    {
+      "id": "geneformer:1.0/c14_k100:protective",
+      "model": "geneformer",
+      "analyses": [
+        "family_max_sensitivity"
+      ],
+      "n_genes": 100,
+      "n_genes_measured": 93,
+      "coverage": 0.93,
+      "genes_missing": [
+        "MALAT1",
+        "GAS5",
+        "SNHG6",
+        "GOLGA8A",
+        "SNHG1",
+        "SNHG12",
+        "KCNQ1OT1"
+      ],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.47570937231298366,
+          "cindex_oriented": 0.5242906276870163,
+          "floor_mean": 0.4878885166187328,
+          "floor_p95": 0.5263666350401754,
+          "above_floor": 0.036402111068283505,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.0153607019452608,
+          "hr_ci": [
+            0.9564723348889228,
+            1.0778747251215584
+          ],
+          "p": 0.6170294889671146,
+          "replicates": false
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.46494677127558026,
+          "cindex_oriented": 0.5350532287244197,
+          "floor_mean": 0.4864496645363056,
+          "floor_p95": 0.54471190123367,
+          "above_floor": 0.04860356418811412,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.086695971415191,
+          "hr_ci": [
+            1.0035548250411188,
+            1.176725082500221
+          ],
+          "p": 0.04062418974031207,
+          "replicates": false
+        }
+      }
+    },
+    {
+      "id": "reference:proliferation",
+      "model": "reference",
+      "analyses": [
+        "reference"
+      ],
+      "n_genes": 11,
+      "n_genes_measured": 11,
+      "coverage": 1.0,
+      "genes_missing": [],
+      "scored": true,
+      "endpoints": {
+        "OS": {
+          "n": 1979,
+          "events": 1143,
+          "cindex": 0.583417588282385,
+          "cindex_oriented": 0.583417588282385,
+          "floor_mean": 0.5035158923117976,
+          "floor_p95": 0.5450342084976428,
+          "above_floor": 0.07990169597058738,
+          "n_cox": 1979,
+          "events_cox": 1143,
+          "hr_per_sd": 1.253630920398067,
+          "hr_ci": [
+            1.179806176786881,
+            1.3320751454770476
+          ],
+          "p": 2.887308228220541e-13,
+          "replicates": true
+        },
+        "DSS": {
+          "n": 1978,
+          "events": 646,
+          "cindex": 0.637002600070911,
+          "cindex_oriented": 0.637002600070911,
+          "floor_mean": 0.5043627155740612,
+          "floor_p95": 0.5687917056828823,
+          "above_floor": 0.13263988449684982,
+          "n_cox": 1978,
+          "events_cox": 646,
+          "hr_per_sd": 1.4434742926296185,
+          "hr_ci": [
+            1.3367474560077452,
+            1.5587222733195945
+          ],
+          "p": 7.556544433205781e-21,
+          "replicates": true
+        }
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "analysis": "primary",
+      "endpoint": "OS",
+      "fm": "scgpt:1.0/c11_k50",
+      "baseline": "hvg_pca:0.3/c21_k50",
+      "margin": -0.02335935600557404,
+      "ci": [
+        -0.05052110698363813,
+        0.002717813363557902
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "primary",
+      "endpoint": "OS",
+      "fm": "geneformer:0.3/c14_k100",
+      "baseline": "hvg_pca:0.3/c21_k50",
+      "margin": -0.03704531977347514,
+      "ci": [
+        -0.06430103193782268,
+        -0.010022539697554168
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "sensitivity",
+      "endpoint": "OS",
+      "fm": "scgpt:1.0/c8_k50:protective",
+      "baseline": "hvg_pca:1.0/c17_k100:protective",
+      "margin": -0.026585209920834907,
+      "ci": [
+        -0.03969344930745377,
+        -0.014185679946961023
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "sensitivity",
+      "endpoint": "OS",
+      "fm": "geneformer:1.0/c14_k25:protective",
+      "baseline": "hvg_pca:1.0/c17_k100:protective",
+      "margin": -0.054216358555459976,
+      "ci": [
+        -0.07767492407135147,
+        -0.031125301507091963
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "primary",
+      "endpoint": "DSS",
+      "fm": "scgpt:1.0/c11_k50",
+      "baseline": "hvg_pca:0.3/c21_k50",
+      "margin": -0.021672034237297466,
+      "ci": [
+        -0.05325489341225054,
+        0.013555454460017557
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "primary",
+      "endpoint": "DSS",
+      "fm": "geneformer:0.3/c14_k100",
+      "baseline": "hvg_pca:0.3/c21_k50",
+      "margin": -0.01621008413865843,
+      "ci": [
+        -0.04982591855395151,
+        0.02004492169904922
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "sensitivity",
+      "endpoint": "DSS",
+      "fm": "scgpt:1.0/c8_k50:protective",
+      "baseline": "hvg_pca:1.0/c17_k100:protective",
+      "margin": -0.050414090838840964,
+      "ci": [
+        -0.06531560645245642,
+        -0.03473561257449003
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    },
+    {
+      "analysis": "sensitivity",
+      "endpoint": "DSS",
+      "fm": "geneformer:1.0/c14_k25:protective",
+      "baseline": "hvg_pca:1.0/c17_k100:protective",
+      "margin": -0.06684524918861429,
+      "ci": [
+        -0.09512187476238364,
+        -0.036803853191233346
+      ],
+      "n_boot": 1000,
+      "floors": "held at their METABRIC full-cohort values"
+    }
+  ]
+}

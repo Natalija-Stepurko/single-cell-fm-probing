@@ -1,0 +1,37 @@
+# The scGPT environment. scgpt 0.2.4 pins torchtext and an older torch, so it cannot share the main
+# environment; the embed stage runs src/scfm/scgpt_worker.py with this interpreter as a subprocess.
+#   make scgpt-env      (or: cd envs/scgpt && uv sync --locked)  ->  envs/scgpt/.venv
+[project]
+name = "scfm-scgpt-env"
+version = "0.2.4"
+requires-python = "==3.11.*"
+dependencies = [
+    "torch==2.3.1",
+    "torchtext==0.18.0",
+    "numpy<2",
+    "scanpy<1.11",
+    "anndata<0.11",
+    "datasets>=2.21,<3",
+    "scikit-misc",
+    "ipython",
+    "huggingface-hub",
+    "scgpt==0.2.4",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+# scgpt's published metadata pulls in flash-attn, scvi-tools and a torch it would then rebuild;
+# the worker needs none of them, so its requirements come from the list above
+[[tool.uv.dependency-metadata]]
+name = "scgpt"
+version = "0.2.4"
+requires-dist = []

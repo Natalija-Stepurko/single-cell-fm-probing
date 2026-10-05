@@ -1,0 +1,43 @@
+{
+  "script": "replicate.py",
+  "timestamp_utc": "2026-10-01T16:42:29+00:00",
+  "command": "src/scfm/stages/replicate.py --real-outcomes",
+  "args": {
+    "freeze": false,
+    "real_outcomes": true,
+    "shuffle_outcomes": false,
+    "dry_run": false,
+    "frozen": "results/replicate/frozen_signatures.json",
+    "raw_dir": "data/raw/metabric",
+    "out_dir": null,
+    "force": false
+  },
+  "git_commit": "2ebb73e3f3a51326894186d317c47e963723686a",
+  "git_dirty": false,
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "pandas": "2.3.3",
+    "sklearn": "1.9.1",
+    "scanpy": "1.12.4",
+    "anndata": "0.13.4",
+    "lifelines": "0.30.3",
+    "leidenalg": "0.12.0",
+    "igraph": "1.0.0",
+    "joblib": "1.6.0",
+    "xgboost": "3.4.1",
+    "matplotlib": "3.11.2",
+    "torch": "2.14.0",
+    "transformers": "5.17.0",
+    "huggingface_hub": "1.33.0",
+    "cellxgene_census": "1.18.0"
+  },
+  "model_revisions": {
+    "scgpt": "a24c237737a40f3720f75abb555489e9fe753be6",
+    "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
+  },
+  "extra": {
+    "outcomes": "real"
+  }
+}

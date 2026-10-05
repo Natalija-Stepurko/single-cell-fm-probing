@@ -1,26 +1,41 @@
 {
-  "script": "05_ladder.py",
-  "timestamp_utc": "2026-09-30T09:14:35+00:00",
-  "command": "/data/scfm/scripts/05_ladder.py",
+  "script": "ladder.py",
+  "timestamp_utc": "2026-10-02T10:48:36+00:00",
+  "command": "src/scfm/stages/ladder.py",
   "args": {
-    "data_dir": "/data/scfm/data",
-    "states_dir": "/data/scfm/results/states",
-    "translate_dir": "/data/scfm/results/translate",
-    "out_dir": "/data/scfm/results/ladder",
+    "data_dir": "data",
+    "states_dir": "results/states",
+    "endpoint": "OS",
+    "translate_dir": "results/translate",
+    "out_dir": "results/ladder",
     "n_boot": 200,
     "seed": 42,
     "dry_run": false
   },
-  "git_commit": "82eb402e057bc492afd9b5968624edf7ec76dd28",
+  "git_commit": "472a7c503affc02889ad3e756a1b164ebc7ebf46",
   "git_dirty": true,
   "versions": {
     "python": "3.12.3",
     "numpy": "2.5.3",
     "scipy": "1.18.1",
+    "pandas": "2.3.3",
     "sklearn": "1.9.1",
-    "torch": "2.14.0+cu130",
+    "scanpy": "1.12.4",
+    "anndata": "0.13.4",
+    "lifelines": "0.30.3",
+    "leidenalg": "0.12.0",
+    "igraph": "1.0.0",
+    "joblib": "1.6.0",
     "xgboost": "3.4.1",
-    "umap": "0.5.12"
+    "matplotlib": "3.11.2",
+    "torch": "2.14.0",
+    "transformers": "5.17.0",
+    "huggingface_hub": "1.33.0",
+    "cellxgene_census": "1.18.0"
+  },
+  "model_revisions": {
+    "scgpt": "a24c237737a40f3720f75abb555489e9fe753be6",
+    "geneformer": "1f7fbae4e469a5f4f1af8c111a529cfe1b3829f5"
   },
   "extra": {
     "predictions": {
@@ -59,6 +74,60 @@
           "LumB": 0.5826042202779207
         },
         "P3_pass": false
+      }
+    },
+    "verdicts": {
+      "primary": {
+        "scgpt": {
+          "P1_as_coded": false,
+          "P1_corrected": false,
+          "P1_corrected_borderline": false,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": false,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        },
+        "geneformer": {
+          "P1_as_coded": false,
+          "P1_corrected": false,
+          "P1_corrected_borderline": false,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": false,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        }
+      },
+      "sensitivity": {
+        "scgpt": {
+          "P1_as_coded": false,
+          "P1_corrected": true,
+          "P1_corrected_borderline": true,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": true,
+          "P3_corrected": false,
+          "P3_corrected_borderline": true,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        },
+        "geneformer": {
+          "P1_as_coded": false,
+          "P1_corrected": false,
+          "P1_corrected_borderline": true,
+          "P2_as_coded": false,
+          "P2_corrected": false,
+          "P3_as_coded": true,
+          "P3_corrected": false,
+          "P3_corrected_borderline": false,
+          "P4_as_coded": true,
+          "P4_corrected": null
+        }
       }
     }
   }

@@ -14,3 +14,43 @@ Sensitivity — each signature read in the direction it acts (added after the pr
   geneformer  C=0.578 [0.528,0.631]  floor=0.490  null95=0.590  hvg=0.04  protective  malignant cell
   scgpt: P1=False P2=False (margin -0.009 [-0.044,+0.022]) P3=True P4=True
   geneformer: P1=False P2=False (margin -0.013 [-0.076,+0.044]) P3=True P4=True
+
+Corrected statistics (beside the pre-registered ones above)
+  reference clinical        n=821 events=116  in-sample C=0.738 (ridge) 0.738 (MLE)  CV C=0.732 (sd over fold repeats 0.004)
+  reference pam50           n=821 events=116  in-sample C=0.598 (ridge) 0.557 (MLE)  CV C=0.525 (sd over fold repeats 0.017)
+  reference pam50_clinical  n=821 events=116  in-sample C=0.745 (ridge) 0.745 (MLE)  CV C=0.723 (sd over fold repeats 0.007)
+  reference clinical_full   n=1072 events=142  in-sample C=0.755 (ridge) 0.755 (MLE)  CV C=0.751 (sd over fold repeats 0.003)
+  reference proliferation   C=0.569 floor=0.480 perm p=0.0085 (MC se 0.001, 10000 perms)
+  primary     hvg_pca     family max 0.571 (1.0/c50_k50) fw p=0.160 (MC se 0.016); pick p=0.703; P1_corrected=False
+  primary     scgpt       family max 0.576 (1.0/c11_k50) fw p=0.126 (MC se 0.015); pick p=0.126; P1_corrected=False
+  primary     geneformer  family max 0.557 (0.5/c13_k25) fw p=0.367 (MC se 0.022); pick p=0.587; P1_corrected=False
+  primary     scgpt       P2 above-floor margin -0.021 [-0.078,+0.012] (selection-aware, B=1000) P2_corrected=False
+  primary     geneformer  P2 above-floor margin -0.039 [-0.084,-0.001] (selection-aware, B=1000) P2_corrected=False
+  sensitivity hvg_pca     family max 0.600 (0.3/c14_k50, 0.5/c21_k50, 1.0/c23_k50) fw p=0.024 (MC se 0.007); pick p=0.066; P1_corrected=True
+  sensitivity scgpt       family max 0.593 (1.0/c5_k50) fw p=0.034 (MC se 0.008, borderline); pick p=0.098; P1_corrected=True
+  sensitivity geneformer  family max 0.590 (1.0/c14_k100) fw p=0.052 (MC se 0.010, borderline); pick p=0.172; P1_corrected=False
+  sensitivity scgpt       P2 above-floor margin -0.010 [-0.054,+0.018] (selection-aware, B=1000) P2_corrected=False
+  sensitivity geneformer  P2 above-floor margin -0.013 [-0.063,+0.021] (selection-aware, B=1000) P2_corrected=False
+  P3 primary/hvg_pca         max within-subtype C 0.584 (Basal) p=0.3820 (MC se 0.0049)
+  P3 primary/scgpt           max within-subtype C 0.583 (LumB) p=0.3890 (MC se 0.0049)
+  P3 primary/geneformer      max within-subtype C 0.583 (LumB) p=0.4003 (MC se 0.0049)
+  P3 sensitivity/hvg_pca     max within-subtype C 0.702 (LumA) p=0.0157 (MC se 0.0012)
+  P3 sensitivity/scgpt       max within-subtype C 0.668 (LumA) p=0.0504 (MC se 0.0022, borderline)
+  P3 sensitivity/geneformer  max within-subtype C 0.627 (LumB) p=0.1495 (MC se 0.0036)
+
+Added value over age + stage (selected rows: nominal LRT p; nested CV redoes the selection in each training fold)
+  primary                 hvg_pca       c21_k50             HR/SD 1.17  LRT p 0.0805  dC fixed +0.0011  nested -0.0010
+  primary                 scgpt         c11_k50             HR/SD 1.04  LRT p 0.627  dC fixed -0.0008  nested -0.0004
+  primary                 geneformer    c14_k100            HR/SD 1.07  LRT p 0.493  dC fixed +0.0012  nested -0.0001
+  sensitivity             hvg_pca       c17_k100            HR/SD 0.79  LRT p 0.00182  dC fixed +0.0108  nested +0.0008
+  sensitivity             scgpt         c8_k50              HR/SD 0.80  LRT p 0.00615  dC fixed +0.0072  nested -0.0011
+  sensitivity             geneformer    c14_k25             HR/SD 0.97  LRT p 0.702  dC fixed -0.0010  nested -0.0016
+  family_max_primary      hvg_pca       c50_k50             HR/SD 1.01  LRT p 0.874  dC fixed -0.0021  nested -0.0007
+  family_max_primary      scgpt         c11_k50             HR/SD 1.04  LRT p 0.627  dC fixed -0.0008  nested -0.0013
+  family_max_primary      geneformer    c13_k25             HR/SD 0.98  LRT p 0.868  dC fixed -0.0023  nested -0.0008
+  family_max_sensitivity  hvg_pca       c14_k50             HR/SD 0.75  LRT p 0.000485  dC fixed +0.0132  nested +0.0074
+  family_max_sensitivity  hvg_pca       c21_k50             HR/SD 0.75  LRT p 0.000485  dC fixed +0.0132  nested +0.0074
+  family_max_sensitivity  hvg_pca       c23_k50             HR/SD 0.75  LRT p 0.000485  dC fixed +0.0132  nested +0.0074
+  family_max_sensitivity  scgpt         c5_k50              HR/SD 0.98  LRT p 0.753  dC fixed -0.0007  nested -0.0037
+  family_max_sensitivity  geneformer    c14_k100            HR/SD 1.01  LRT p 0.887  dC fixed -0.0027  nested -0.0082
+  reference               proliferation PAM50 proliferation HR/SD 1.21  LRT p 0.0198  dC fixed +0.0083  nested +0.0083
