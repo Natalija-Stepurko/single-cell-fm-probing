@@ -5,22 +5,39 @@ better than the states a linear baseline finds? A test on 50,002 breast-cancer c
 The Cancer Genome Atlas (TCGA) and an independent replication in 1,979 patients (1,980 with expression) of
 the Molecular Taxonomy of Breast Cancer International Consortium (METABRIC).
 
-**Result.** Cell states from scGPT and Geneformer, turned into marker-gene signatures and scored in
-TCGA-BRCA (The Cancer Genome Atlas breast cohort), predict overall survival (OS) no better than states
-from highly-variable-gene principal component analysis (HVG-PCA): no representation's best signature
-clears its family-wise permutation null (p = 0.16 HVG-PCA, 0.13 scGPT, 0.37 Geneformer), and the
-selection-aware margin of each foundation model over the baseline is negative (−0.021 scGPT, −0.039
-Geneformer, in concordance index above the random-gene floor). Added to age and stage, no
-foundation-model state improves the concordance index (C-index) under nested cross-validation, while
-the published 11-gene proliferation score of the PAM50 (Prediction Analysis of Microarray, 50 genes)
-subtype classifier does (+0.008). In METABRIC, scored with signatures frozen before the outcomes were
-read, all eight foundation-model-minus-baseline margins are negative (intervals below zero for one of the
-four pre-specified comparisons and all four post hoc ones) and the proliferation score replicates most
+**Result.** Cell states defined with zero-shot scGPT (whole-human checkpoint) and Geneformer (6-layer
+V1), turned into marker-gene signatures and scored in TCGA-BRCA (The Cancer Genome Atlas breast cohort),
+predict overall survival (OS) no better than states from highly-variable-gene principal component
+analysis (HVG-PCA). In the pre-specified risk direction no representation's best signature clears its
+family-wise permutation null (p = 0.20 HVG-PCA, 0.098 scGPT, 0.37 Geneformer; 10,000 permutations), and
+the selection-aware margin of each foundation model over the baseline is negative (−0.021 scGPT, −0.039
+Geneformer, in concordance index above the random-gene floor). Added to age and stage, no pick shows a
+reproducible improvement in the cross-validated concordance index (C-index) under nested selection; the
+published 11-gene proliferation score of the PAM50 (Prediction Analysis of Microarray, 50 genes) subtype
+classifier raises it by 0.008. In METABRIC, scored with signatures frozen before the outcomes were read,
+all eight foundation-model-minus-baseline margins are negative (intervals below zero for one of the four
+pre-specified comparisons and all four post hoc ones) and the proliferation score replicates most
 strongly (OS C = 0.583 against a random-gene floor 95th percentile of 0.545).
+
+**Scope.** The study tests whether cell-state marker programmes from these two checkpoints, used
+zero-shot, transfer into bulk prognosis. A bulk marker-gene score is a lossy projection of a state, so
+this is not a test of whether the embeddings contain prognostic information; cancer-adapted checkpoints
+(for example CancerFoundation or the cancer-tuned Geneformer) were not tested, and the indication is
+breast cancer only.
+
+**Secondary analyses (post hoc, outcome-free).** Four of the six picks track PAM50 subtype in TCGA and
+METABRIC (scGPT's risk pick HER2-enriched, Geneformer's basal-like, the two luminal protective picks low
+in basal-like tumours). The foundation-model embeddings produce fewer donor-specific states than HVG-PCA
+(6 of 67 scGPT and 10 of 71 Geneformer states draw at least 80% of their cells from one donor, against 50
+of 123 HVG-PCA states), but this does not give clearly stronger signatures: the best multi-donor state's
+margin above its floor is 0.074 (scGPT) and 0.035 (Geneformer) against 0.075 (HVG-PCA) in the risk
+direction, and 0.010 and 0.002 ahead of HVG-PCA's in the either-direction reading, without an interval.
+Under donor subsampling the clusterings are stable (mean adjusted Rand index 0.80–0.93).
 
 ![The ladder: each representation's best signature against its permutation null and matched-random floor](results/report/fig_ladder.png)
 
-Project page with the full write-up: <https://natalija-stepurko.github.io/single-cell-fm-probing/>.
+Project page (summary, then the full technical report on the same page):
+<https://natalija-stepurko.github.io/single-cell-fm-probing/>.
 Design, predictions and corrections: [`docs/DESIGN.md`](docs/DESIGN.md). Related work:
 [`research/literature.md`](research/literature.md).
 
@@ -41,7 +58,8 @@ Design, predictions and corrections: [`docs/DESIGN.md`](docs/DESIGN.md). Related
    tumours (151 deaths). The concordance index of that score alone (Harrell's C) measures how well it
    orders patients by OS; a Cox proportional-hazards model with age and stage gives its hazard ratio.
 5. **Read against a ladder.** A family-wise permutation null for the best of each representation's
-   signatures (500 outcome permutations), a floor of 200 random gene sets matched on size and mean
+   signatures (10,000 outcome permutations; the design specified 500, and both sets are kept in
+   `results/ladder/ladder.json` and agree on every verdict), a floor of 200 random gene sets matched on size and mean
    expression, the HVG-PCA baseline, and references: age + stage, the PAM50 intrinsic subtype alone,
    PAM50 with age + stage, and the published PAM50 11-gene proliferation score (chosen after the first
    run to fill the design's published-signature rung; pre-specified for METABRIC).
@@ -50,6 +68,10 @@ Design, predictions and corrections: [`docs/DESIGN.md`](docs/DESIGN.md). Related
    before any data were downloaded), a post-hoc sensitivity analysis that reads protective signatures in
    their own direction, added value over age and stage under nested cross-validation, multivariable
    models of all states, and a frozen-signature replication in METABRIC.
+7. **Post hoc secondary analyses** (DESIGN §12.4): the association of every pick with PAM50 subtype in
+   TCGA and METABRIC (`results/ladder/subtype_association.{csv,json}`), the donor mixing of every state
+   against its above-floor margin (`results/ladder/donor_mixing.{csv,json}`), and the stability of the
+   clusterings and picks under donor subsampling (`results/states/stability*.csv`).
 
 How each prediction came out, including where the first run's code departed from the design and what
 is reported now, is in [`docs/DESIGN.md` §12](docs/DESIGN.md#12-deviations-from-the-design-and-corrections).
@@ -66,9 +88,10 @@ and dirty flag, library versions, pinned model revisions, timestamp).
 | `embed` | `stages/embed.py` | one embedding per cell for `hvg_pca`, `scgpt` (subprocess in the scGPT environment, `scgpt_worker.py`) and `geneformer`; bfloat16, length-sorted batches, sharded and resumable |
 | `states` | `stages/states.py` | Leiden clusters per representation and resolution → marker-gene signatures; state composition (donors, datasets, cell types); uniform manifold approximation and projection (UMAP) coordinates |
 | `translate` | `stages/translate.py` | signature scores in bulk; C-index; Cox hazard ratio with age and stage; family-wise permutation null; matched-random floor; reference models |
-| `ladder` | `stages/ladder.py` | the ladder; patient bootstraps; P1–P4 as coded and corrected; per-setting ladder; added value over age + stage (fixed and nested cross-validation) |
+| `stability` | `stages/stability.py` | clusterings and picks under donor subsampling (20 repeats, 80% of donors): adjusted Rand index, cell and marker Jaccard per pick; runs after `ladder`, not part of `scfm run all` |
+| `ladder` | `stages/ladder.py` | the ladder; the 10,000-permutation family-wise null beside the specified 500; patient bootstraps; P1–P4 as coded and corrected; per-setting ladder; added value over age + stage (fixed and nested cross-validation); PAM50 subtype association of the picks (`subtype.py`) and donor mixing of the states (`donors.py`), both outcome-free |
 | `stratify` | `stages/stratify.py` | cross-validated multivariable models: all of a representation's states with age + stage (ridge Cox and gradient-boosted Cox) |
-| `report` | `stages/report.py` | figures, candidate shortlist, validation template |
+| `report` | `stages/report.py` | figures (ladder, states, added value, stratification, replication, Kaplan-Meier, margin, PAM50 subtype, donor mixing), candidate shortlist, validation template |
 | `replicate` | `stages/replicate.py` | METABRIC replication: `--freeze` writes the frozen signatures, `--real-outcomes` scores them (refuses unless the frozen file is committed and unmodified), `--shuffle-outcomes` tests the stage on permuted outcomes; not part of `scfm run all` |
 
 ```bash
@@ -98,7 +121,7 @@ make reproduce        # deletes and regenerates results/{translate,ladder,strati
 make verify           # compares every tracked file under results/ with results/MANIFEST.sha256
 ```
 
-The translate stages take 15–20 min each (OS and PFI), the ladder stages 3–4 min each, stratify
+The translate stages take 15–20 min each (OS and PFI), the ladder stages about 4–5 min each, stratify
 about 1 min. The UMAP figure needs the per-cell tables from `states`
 (`results/states/cells_<model>.parquet`, not tracked) and is skipped without them.
 
@@ -111,6 +134,7 @@ uv sync --locked --all-extras --group dev
 uv run scfm run data -- --cell-list results/atlas_cells.csv   # same 50,002 cells, from Census 2025-11-08
 uv run scfm run states                                          # about 8-12 min
 make reproduce && make verify
+uv run scfm run stability                                       # optional, about 27 min on 6 cores
 ```
 
 **Tier C: from scratch, both environments (about 2 h 45 min of stage time on CPU, plus environment
@@ -131,7 +155,8 @@ make verify
 | `embed`, all three representations | 1 h 44 min (scGPT 83 min, about 10 cells/s; Geneformer 21 min, about 40 cells/s) |
 | `states` | 8–12 min |
 | `translate` (OS) | 15–19 min |
-| `ladder` | 3–4 min |
+| `ladder` | 4–5 min |
+| `stability` (not in `all`) | 27 min on 6 cores |
 | `stratify` | 1 min |
 | `report` | under 10 s |
 | `replicate --real-outcomes` | 4 min 21 s |
@@ -216,10 +241,12 @@ src/scfm/             the package: cli.py, config.py, provenance.py, survival.py
 envs/scgpt/           the locked scGPT environment (Python 3.11)
 tests/                pytest; fixtures for the Geneformer tokeniser
 docs/DESIGN.md        the design, the sensitivity analysis, deviations and corrections, the replication spec
-docs/index.html       the project page (GitHub Pages), built by docs/site/build.py from results/
+docs/index.html       the project page (GitHub Pages): a summary, then the technical report; built by
+                      docs/site/build.py from results/
 research/             related work
-results/              tracked: cell list, signatures, state composition, scores, nulls, ladders,
-                      stratification, METABRIC replication, figures, params and run log;
+results/              tracked: cell list, signatures, state composition, cluster stability, scores,
+                      nulls, ladders, subtype association, donor mixing, stratification, METABRIC
+                      replication, figures, params and run log;
                       MANIFEST.sha256 for `make verify`. Embeddings and per-cell tables stay local.
 data/  smoke/         git-ignored
 ```

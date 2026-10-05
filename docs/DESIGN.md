@@ -242,7 +242,8 @@ unless stated.*
 - *Design:* decisions at α = 0.05.
 - *First run:* permutation p-values from 500 or 1,000 permutations, without their Monte-Carlo error.
 - *Now:* every permutation p carries its Monte-Carlo standard error and is flagged borderline within two
-  standard errors of 0.05. The family-wise null keeps its pre-specified 500 permutations.
+  standard errors of 0.05. The family-wise null keeps its pre-specified 500 permutations, and a
+  10,000-permutation null is reported beside it (§12.4).
 
 **Ladder per setting (§10).**
 - *Design:* resolution and marker count are swept, and the ladder is reported at each setting.
@@ -255,8 +256,9 @@ unless stated.*
 
 **Clustering stability (§6).**
 - *Design:* cell-level clustering is done once; its stability is a separate diagnostic.
-- *First run and now:* the diagnostic was not run. Leiden uses a fixed seed and reproduces the stored
-  cluster sizes exactly; states are reported at three resolutions and nine settings.
+- *First run:* the diagnostic was not run. Leiden uses a fixed seed and reproduces the stored cluster
+  sizes exactly; states are reported at three resolutions and nine settings.
+- *Now:* run post hoc under donor subsampling (§12.4).
 
 **Secondary endpoint (§10).**
 - *Design:* the progression-free interval (PFI) is the secondary endpoint, for power; both reported.
@@ -343,6 +345,57 @@ outcomes before commit `2ebb73e`, and the stage was first tested on permuted out
 (`--shuffle-outcomes`). One patient with non-positive OS time is excluded, and one more from disease-specific survival (DSS)
 with unknown status. Geneformer's protective pick is scored on 22 of its 25 genes (coverage 0.88, above the 0.8
 minimum).
+
+### 12.4 Post hoc additions (after the METABRIC replication)
+
+Added on 2026-10-05 in response to an external review. None of them changes a pre-specified number or
+verdict; each draws from its own random stream or reads no outcomes.
+
+**Family-wise null with 10,000 permutations (§6).**
+- *Design:* 500 outcome permutations.
+- *Added:* `family_wise_10k` in `results/ladder/ladder.json` and `results/ladder_pfi/ladder.json`: one
+  set of 10,000 permutations shared by the three representations (seed 57), with the vectorised C-index
+  checked against lifelines on 36 permutations (largest difference 0). It is the family-wise p reported on
+  the project page and in the README, because its Monte-Carlo standard error near 0.05 is about 0.002
+  against about 0.010 with 500. The 500-permutation values stay in `family_wise`, and the two agree on
+  every verdict (`verdicts_changed` is empty for OS and PFI). OS, pre-specified direction: p = 0.199
+  HVG-PCA, 0.098 scGPT, 0.370 Geneformer. Either direction: 0.025, 0.041 and 0.055; Geneformer's p lies
+  2.0 Monte-Carlo standard errors above 0.05, so it does not clear and is reported as borderline. PFI,
+  either direction: Geneformer clears (p = 0.049, borderline), as with 500.
+
+**PAM50 subtype association of the picks (outcome-free).** `stages/subtype.py`, called by `ladder`:
+for every pick, family maximum and the proliferation reference, the score's median and quartiles per
+subtype, Kruskal-Wallis H with ε² = H / (n − 1), and one-vs-rest AUCs; TCGA with the PAM50 call (842
+patients), METABRIC with CLAUDIN_SUBTYPE (1,974 patients, NC excluded, no outcomes read). Four of the six
+picks track subtype in both cohorts (scGPT's risk pick HER2-enriched, AUC 0.88 in TCGA; Geneformer's risk
+pick basal-like, 0.89; the luminal protective picks of HVG-PCA and scGPT low in basal-like tumours, 0.06
+and 0.24); the baseline's single-dataset pick and Geneformer's stress state barely differ by subtype
+(ε² 0.03 and 0.04). The survival association given PAM50 is the age + stage + PAM50 row of
+`added_value.csv`. Outputs: `results/ladder/subtype_association.{csv,json}`.
+
+**Donor mixing of the states (outcome-free composition, margins from translate).** `stages/donors.py`,
+called by `ladder`: per representation, the kept states (each once, through its 50-gene signature;
+three resolutions pooled, so counts and the Fisher p are descriptive), the number dominated by one donor
+(largest donor ≥ 80% of the cells), the median top-donor share, and the best above-floor margin among
+multi-donor states (largest donor < 50%) in both readings. Single-donor states: 50 of 123 HVG-PCA, 6 of
+67 scGPT, 10 of 71 Geneformer. Best multi-donor margin, risk reading: 0.075, 0.074, 0.035; either
+direction: 0.081, 0.091, 0.083. The foundation models produce fewer donor-specific states, and their best
+multi-donor states are not above the baseline's in the risk reading and 0.010 and 0.002 above it in the
+either-direction reading (single selected values, no interval). Outputs:
+`results/ladder/donor_mixing.{csv,json}`.
+
+**Cluster stability under donor subsampling.** New stage `stability` (after `ladder`, not part of
+`all`): 20 repeats, each keeping 80% of the 152 donors (122; one draw per repeat shared by the
+representations), the 15-NN graph and Leiden clustering rebuilt with the settings of `states`. Adjusted
+Rand index against the full clustering restricted to the kept cells: 0.80–0.93 (means per
+representation and resolution). Per pick, the best-matching subsample cluster's cell Jaccard averages
+0.44 (scGPT's luminal ER pick) to 0.90 (the baseline's single-dataset pick); single-donor picks are
+reproduced almost exactly whenever their donor is kept. Outputs: `results/states/stability.csv`,
+`stability_picks.csv`, `stability_repeats.csv`, `stability_params.json`.
+
+**Project page.** One page: a summary (question, benchmark, headline result, added value, METABRIC,
+the states, novelty, scope, how the analysis was checked) and a technical report below it, with the
+deviations of §12 as one table.
 
 ## 13. Independent replication in METABRIC (specified before the run)
 

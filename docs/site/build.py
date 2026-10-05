@@ -1,8 +1,11 @@
 """Build the project page as one self-contained HTML file: docs/index.html (served by GitHub Pages).
 
-Every number on the page is read from results/ when the page is built, and every pass/fail verb in the
-prose is chosen from the booleans in results/ladder/ladder.json and results/replicate/metabric.json and
-checked with an assert, so a change in the results either changes the text or stops the build.
+One scrollable page: a summary (question, benchmark, result, replication, the states, novelty, scope)
+followed by a "Technical detail" part with the full study. Every number on the page is read from
+results/ when the page is built, and every pass/fail verb in the prose is chosen from the booleans in
+results/ladder/ladder.json and results/replicate/metabric.json and checked with an assert, so a change in
+the results either changes the text or stops the build. Family-wise p-values are the 10,000-permutation
+ones (ladder.json family_wise_10k).
 Figures are the PNGs that `scfm run report` writes, embedded as data URIs.
 
     python docs/site/build.py                -> docs/index.html
@@ -66,6 +69,14 @@ SCORES = rows("translate/scores.csv")
 ATLAS = rows("atlas_cells.csv")
 SIGS = jload("states/signatures.json")
 DUPS = jload("report/atlas_duplicates.json")
+SUBT = jload("ladder/subtype_association.json")
+SUBT_ROWS = SUBT["rows"]
+SUBT_CSV = rows("ladder/subtype_association.csv")
+DON = jload("ladder/donor_mixing.json")
+STAB = rows("states/stability.csv")
+STABP = rows("states/stability_picks.csv")
+STABPAR = jload("states/stability_params.json")
+BYSET = rows("ladder/ladder_by_setting.csv")
 
 FIG = {f["name"]: f for f in FIGS["figures"]}
 PAL = FIGS["style"]["palette"]
@@ -125,7 +136,8 @@ N_PAT, N_EV = L["n_patients"], L["n_events"]
 check(L["endpoint"] == "OS", "ladder.json is the OS ladder")
 REF = L["reference"]
 PROLIF = REF["proliferation"]
-FW = L["family_wise"]
+FW = L["family_wise_10k"]          # the reported family-wise p (10,000 permutations)
+FW500 = L["family_wise"]           # the design's 500 permutations, kept in the results
 P2C = L["p2_corrected"]
 P3C = L["p3_corrected"]
 VER = L["verdicts"]
@@ -144,7 +156,16 @@ UNIVERSE, UNIVERSE_HVG = SSUM["universe_n"], SSUM["universe_n_hvg"]
 RESOLUTIONS = SPAR["args"]["resolutions"]
 TOPK = SPAR["args"]["topk"]
 MIN_CELLS = SPAR["args"]["min_cells"]
-N_PERM = TPAR["args"]["n_perm"]
+N_PERM_DESIGN = TPAR["args"]["n_perm"]
+N_PERM = FW["n_perm"]
+check(N_PERM == 10000 and N_PERM_DESIGN == 500, "family-wise null: 10,000 permutations reported, 500 specified")
+check(FW["verdicts_changed"] == [] and LP["family_wise_10k"]["verdicts_changed"] == [], "no verdict changes with 10k")
+for _L in (L, LP):
+    for _a in ("primary", "sensitivity"):
+        for _m in MODELS:
+            _d = _L["family_wise_10k"][_a][_m]
+            check(_d["P1_corrected"] == _d["P1_corrected_500"] == _L["family_wise"][_a][_m]["P1_corrected"],
+                  f"500 and 10,000 permutations agree on P1 for {_a}/{_m}")
 N_FLOOR = TPAR["args"]["n_floor"]
 MIN_C = min(float(r["cindex"]) for r in SCORES)
 check(len(SCORES) == sum(N_SIGS.values()), "scores.csv holds every signature")
@@ -293,6 +314,7 @@ REFS = {
     "roman": ("Roman et al. 2025", "Roman A, Johri S, Conci R, Van Allen EM, Elmarakeby H. Empirical evaluation of single-cell foundation models for predicting cancer outcomes. bioRxiv (2025; v2 2026).", "10.1101/2025.10.31.685892"),
     "sun": ("Sun et al. 2022", "Sun D, Guan X, Moran AE, et al. Identifying phenotype-associated subpopulations by integrating bulk and single-cell sequencing data. <em>Nature Biotechnology</em> 40:527–538 (2022).", "10.1038/s41587-021-01091-3"),
     "tcga": ("Cancer Genome Atlas Network 2012", "Cancer Genome Atlas Network. Comprehensive molecular portraits of human breast tumours. <em>Nature</em> 490:61–70 (2012).", "10.1038/nature11412"),
+    "theus": ("Theus et al. 2024", "Theus A, Barkmann F, Wissel D, Boeva V. CancerFoundation: a single-cell RNA sequencing foundation model to decipher drug resistance in cancer. bioRxiv (2024).", "10.1101/2024.11.01.621087"),
     "theodoris": ("Theodoris et al. 2023", "Theodoris CV, Xiao L, Chopra A, et al. Transfer learning enables predictions in network biology. <em>Nature</em> 618:616–624 (2023).", "10.1038/s41586-023-06139-9"),
     "tirosh": ("Tirosh et al. 2016", "Tirosh I, Izar B, Prakadan SM, et al. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. <em>Science</em> 352:189–196 (2016).", "10.1126/science.aad0501"),
     "traag": ("Traag et al. 2019", "Traag VA, Waltman L, van Eck NJ. From Louvain to Leiden: guaranteeing well-connected communities. <em>Scientific Reports</em> 9:5233 (2019).", "10.1038/s41598-019-41695-z"),
@@ -623,6 +645,16 @@ def floor_se(sid, ep):
     return (0.95 * 0.05 / FROZ["n_floor_sets"]) ** 0.5 / 0.10314 * sd
 
 
+def mc_z(d, p="fw_p"):
+    """Distance of a permutation p from alpha in Monte-Carlo standard errors."""
+    return (d[p] - C.ALPHA) / d[f"{p}_mc_se"]
+
+
+def bl10k(d, p="fw_p"):
+    """Borderline: within two Monte-Carlo standard errors of alpha (to one decimal)."""
+    return round(abs(mc_z(d, p)), 1) <= 2.0
+
+
 def floor_borderline(sid, ep):
     return abs(gap(sid, ep)) < 2 * floor_se(sid, ep)
 
@@ -678,225 +710,257 @@ check(P3_NPERM == L["monte_carlo"]["p3_permutations"], "P3 permutation count agr
 
 
 # ----------------------------------------------------------------------------- sections
+# Figures are numbered in the order they appear on the page; build() checks the order.
+FIGNO = {"fig_ladder": 1, "fig_added_value": 2, "fig_margin": 3, "fig_km": 4, "fig_states": 5,
+         "fig_subtype": 6, "fig_donor": 7, "fig_stratify": 8, "fig_replication": 9}
+
+
+def fig(name):
+    return figure(name, f"Figure {FIGNO[name]}")
+
+
+def fr(name):
+    return f"Figure {FIGNO[name]}"
+
+
+GROUP = {"Her2": "HER2-enriched", "Basal": "basal-like", "LumA": "luminal A", "LumB": "luminal B",
+         "Normal": "normal-like", "Luminal": "luminal", "claudin-low": "claudin-low"}
+
+
+def _num(v):
+    return float(v) if v not in ("", None) else None
+
+
+def subt(cohort, analysis, model):
+    """The subtype-association row of a pick (or the reference) in one cohort."""
+    out = [r for r in SUBT_CSV if r["cohort"] == cohort and r["model"] == model
+           and analysis in r["analyses"].split(";")]
+    check(len(out) == 1, f"one subtype row for {cohort} {analysis}/{model}")
+    r = out[0]
+    if analysis in ("primary", "sensitivity"):
+        check(f"{float(r['resolution']):.1f}/{r['signature']}" == pick_key(PICKS[analysis][model]),
+              f"subtype row of {analysis}/{model} is for its pick")
+    return r
+
+
+SUB = {(a, m): (subt("TCGA", a, m), subt("METABRIC", a, m)) for a in PICKS for m in MODELS}
+SUB_REF = (subt("TCGA", "reference", "proliferation"), subt("METABRIC", "reference", "proliferation"))
+TRACKERS = [("primary", "scgpt"), ("primary", "geneformer"), ("sensitivity", "hvg_pca"), ("sensitivity", "scgpt")]
+NON_TRACKERS = [("primary", "hvg_pca"), ("sensitivity", "geneformer")]
+check(all(float(SUB[k][0]["epsilon2"]) > 0.1 for k in TRACKERS), "four picks track PAM50 subtype in TCGA (eps2 > 0.1)")
+check(all(float(SUB[k][0]["epsilon2"]) < 0.05 for k in NON_TRACKERS), "two picks barely differ by subtype in TCGA")
+check(float(SUB_REF[0]["epsilon2"]) > 0.5 and float(SUB_REF[1]["epsilon2"]) > 0.5,
+      "the proliferation score has eps2 above 0.5 in both cohorts")
+for k in TRACKERS:
+    t, mb = SUB[k]
+    check(mb["tcga_tracked_group"] == t["tracked_group"], f"METABRIC row of {k} carries the TCGA group")
+    check((float(t["auc_tracked"]) - 0.5) * (float(mb["auc_tracked_tcga_group"]) - 0.5) > 0,
+          f"{k}: METABRIC tracks the TCGA subtype in the same direction")
+check([SUB[k][0]["tracked_group"] for k in TRACKERS] == ["Her2", "Basal", "Basal", "Basal"],
+      "tracked groups: HER2 (scGPT risk), basal (Geneformer risk), basal-low (the luminal protective picks)")
+FM_RISK_GIVEN_PAM = [AV_PICKS[("primary", m, "age+stage+PAM50")] for m in FMS]
+check(all(r["hr_per_sd"] < 1 and r["lrt_p_nominal"] > C.ALPHA for r in FM_RISK_GIVEN_PAM),
+      "given PAM50, the foundation-model risk picks have HR < 1 and nominal p > 0.05")
+
+# donor mixing
+DPR = {r["model"]: r for r in DON["per_representation"]}
+for m in MODELS:
+    check((DPR[m]["n_single_donor"], DPR[m]["n_states"]) == SINGLE_DONOR_STATES[m],
+          f"donor_mixing.json and state_composition.csv agree on {m}'s single-donor states")
+check(all(DON["checks"][f"{m}_fewer_single_donor_share_than_baseline"] for m in FMS), "FMs: fewer single-donor states")
+check(not any(DON["checks"][f"{m}_best_multi_donor_margin_above_baseline"] for m in FMS),
+      "risk reading: no FM's best multi-donor state is above the baseline's")
+check(all(DON["checks"][f"{m}_best_multi_donor_margin_or_above_baseline"] for m in FMS),
+      "either-direction reading: both FMs' best multi-donor states are above the baseline's")
+DON_OR_AHEAD = {m: DPR[m]["best_margin_or_multi_donor"] - DPR["hvg_pca"]["best_margin_or_multi_donor"] for m in FMS}
+check(all(0 < v < 0.02 for v in DON_OR_AHEAD.values()), "either-direction FM lead is small (< 0.02)")
+check(all(DPR[m]["spearman_rho_margin_or_vs_top_donor"] > 0 and DPR[m]["spearman_p_or"] < 0.01 for m in MODELS),
+      "either direction: margin rises with top-donor share in all three representations")
+
+# stability
+STAB_ARI = [float(r["ari_mean"]) for r in STAB]
+STAB_PICKS = {}
+for a in PICKS:
+    for m in MODELS:
+        role = f"{a if a == 'primary' else 'sensitivity'} pick"
+        hit = [r for r in STABP if r["model"] == m and role in r["roles"].split("; ")]
+        check(len(hit) == 1 and f"{float(hit[0]['resolution']):.1f}/{hit[0]['signature']}" == pick_key(PICKS[a][m]),
+              f"stability row of the {a} {m} pick")
+        STAB_PICKS[(a, m)] = hit[0]
+STAB_J = {k: float(r["cell_jaccard_mean"]) for k, r in STAB_PICKS.items()}
+STAB_LO = min(STAB_J, key=STAB_J.get)
+STAB_HI = max(STAB_J, key=STAB_J.get)
+check(STAB_LO == ("sensitivity", "scgpt") and STAB_HI == ("primary", "hvg_pca"),
+      "least stable pick: scGPT's luminal ER pick; most stable: the baseline's single-dataset pick")
+N_REP, KEEP = STABPAR["args"]["repeats"], STABPAR["args"]["keep_frac"]
+N_DON_KEPT = STABPAR["extra"]["donors_kept_per_repeat"]
+
+# Monte-Carlo position of the borderline either-direction Geneformer family
+GF_Z = mc_z(fw_sens["geneformer"])
+check(not fw_sens["geneformer"]["P1_corrected"] and bl10k(fw_sens["geneformer"]) and 1.95 <= GF_Z <= 2.05,
+      "Geneformer either direction: does not clear, 2.0 Monte-Carlo SE above 0.05")
+check(not any(bl10k(fw_prim[m]) for m in MODELS) and [m for m in MODELS if bl10k(fw_sens[m])] == ["geneformer"],
+      "the only borderline OS family-wise p is Geneformer's either-direction one")
+PICK_C = [PICKS[a][m]["cindex"] for a in PICKS for m in MODELS]
+
+
 def header_html(today):
     pp = {m: pv(fw_prim[m]["fw_p"]) for m in MODELS}
     m2 = {m: sgn(P2C["primary"][m]["margin"]) for m in FMS}
-    prol = AV_PROLIF["age+stage"]["delta_cindex_cv_nested_mean"]
-    h1 = "Foundation-model cell states predict breast-cancer survival no better than a linear baseline, in TCGA and in METABRIC"
-    check(P2_ALL_FAIL and all(x < 0 for x in MARGINS), "headline")
+    h1 = "Cell states from two single-cell foundation models predict breast-cancer survival no better than a linear baseline"
+    check(P2_ALL_FAIL and all(x < 0 for x in MARGINS) and NONE_CLEARS_PRIM, "headline")
     abstract = (
-        f"Cell states were defined in {n_(N_CELLS)} cells from {N_DONORS} donors of a breast-cancer single-cell atlas with two "
-        f"single-cell foundation models, scGPT and Geneformer, and with a linear baseline, HVG-PCA: principal component "
-        f"analysis (PCA) of the highly variable genes (HVGs). Each state's marker genes were scored as a signature in {n_(N_PAT)} tumours of The "
-        f"Cancer Genome Atlas breast cohort (TCGA-BRCA; {N_EV} deaths) and tested for overall survival (OS) against outcome "
-        f"permutations, random gene sets matched for size and expression, and clinical references: age, stage and the PAM50 "
-        f"(Prediction Analysis of Microarray, 50 genes) intrinsic subtype. In the pre-specified risk "
-        f"direction no representation's best signature cleared its family-wise permutation null (p = {pp['hvg_pca']} HVG-PCA, "
-        f"{pp['scgpt']} scGPT, {pp['geneformer']} Geneformer), and each foundation model's margin over the baseline in "
-        f"concordance index (C-index) above the random-gene floor was negative (scGPT {m2['scgpt']}, Geneformer {m2['geneformer']}), "
-        f"measured against a baseline pick that is a single-dataset state with a low floor. "
-        f"Added to age and stage, no pick changed the cross-validated C-index by more than {sgn(min(NESTED_PICK))} to "
-        f"{sgn(max(NESTED_PICK))} under nested selection (only HVG-PCA's either-direction family maximum added, "
-        f"{sgn(FAMMAX_HVG_AS)}); the published 11-gene proliferation score of PAM50 added {sgn(prol)}. With the signatures "
-        f"frozen before outcomes were read, all {len(MCMP)} foundation-model-minus-baseline margins were negative in "
-        f"{n_(MEND['OS']['n'])} patients of the Molecular Taxonomy of Breast Cancer International Consortium (METABRIC); the "
-        f"interval lies below zero for {WORD[len(BELOW_PRIM)]} of the {WORD[len(CMP_PRIM)]} pre-specified comparisons "
-        f"({BELOW_PRIM_TXT}) and for all {WORD[len(CMP_SENS)]} post hoc ones.")
+        f"Do cell states found by single-cell foundation models carry prognostic information that a linear method "
+        f"misses? Cell states were defined in {n_(N_CELLS)} cells from {N_DONORS} donors of a breast-cancer atlas with "
+        f"zero-shot scGPT and Geneformer and with a linear baseline (principal components of highly variable genes, "
+        f"HVG-PCA), turned into marker-gene signatures and scored in {n_(N_PAT)} TCGA-BRCA tumours against outcome "
+        f"permutations, matched random gene sets and clinical references. In the pre-specified risk direction no "
+        f"representation's best signature cleared its family-wise permutation null (p = {pp['hvg_pca']} "
+        f"HVG-PCA, {pp['scgpt']} scGPT, {pp['geneformer']} Geneformer), and both foundation models' margins over the baseline were negative "
+        f"(scGPT {m2['scgpt']}, Geneformer {m2['geneformer']} in C-index). No pick showed a reproducible improvement "
+        f"over age and stage. With signatures fixed before outcomes were examined, all {WORD[len(MCMP)]} "
+        f"foundation-model-minus-baseline margins were negative in {n_(MEND['OS']['n'])} METABRIC patients. The "
+        f"result concerns marker-gene projections of the tested checkpoints, not everything their embeddings encode.")
+    gh = ('<svg viewBox="0 0 16 16" aria-hidden="true" width="17" height="17"><path fill="currentColor" d="M8 0C3.58 '
+          '0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94'
+          '-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-'
+          '.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42'
+          ' 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15'
+          ' 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16'
+          ' 8c0-4.42-3.58-8-8-8Z"/></svg>')
     return f"""<header>
 <p class="eyebrow"><span>Single-cell foundation models · breast cancer · survival</span></p>
 <h1>{h1}</h1>
-<p class="byline"><span class="nw">Natalija Stepurko</span> · <span class="nw">{today:%B %Y}</span> · <a class="nw" href="{SITE}">natalija-stepurko.com</a> · <a href="{REPO}">code</a></p>
+<p class="scope">Zero-shot scGPT and Geneformer · marker-gene signatures · TCGA-BRCA and an independent METABRIC replication</p>
+<p class="byline"><span class="nw">Natalija Stepurko</span> · <span class="nw">{today:%B %Y}</span> · <a class="nw" href="{SITE}">natalija-stepurko.com</a></p>
 <p class="abstract">{abstract}</p>
+<a class="repo" href="{REPO}">{gh}<span><b>All the code is public.</b> Every number and figure on this page comes from the pipeline in this repository: atlas assembly, embeddings, the controls and the METABRIC replication.</span><span class="repo-path">Natalija-Stepurko/single-cell-fm-probing</span></a>
 </header>"""
+
+
+# ----------------------------------------------------------------------------- summary
+def question_html():
+    return f"""<h2 id="question">The question</h2>
+<p>Single-cell foundation models such as scGPT {cite('cui')} and Geneformer {cite('theodoris')} are pretrained on tens of millions of cells, and a common claim is that they learn cell biology that a linear analysis of the same data misses. For drug discovery and patient stratification the test that matters is whether that biology separates patients by outcome. This study asks whether cell states defined by these two models in a tumour atlas, carried into patient cohorts as marker-gene signatures, predict breast-cancer survival better than states from a linear baseline.</p>"""
+
+
+def benchmark_html():
+    return f"""<h2 id="benchmark">A fair benchmark</h2>
+{panel(fig_flow(), "One atlas, three views, one patient cohort, one ladder")}
+<p>The three representations share everything except the representation itself: the same {n_(N_CELLS)} cells, the same Leiden clustering, marker ranking and gene universe, the same scoring of each state's markers in {n_(N_PAT)} TCGA-BRCA tumours, and the same survival statistics. Each representation's pick is the state whose signature lies furthest above its random-gene floor. Every result is read against three controls:</p>
+<ul class="ctl">
+<li><strong>Family-wise permutation null.</strong> Outcomes are permuted {n_(N_PERM)} times and the best of a representation's {min(N_SIGS.values())}–{max(N_SIGS.values())} signatures is kept each time, so the null includes picking a winner.</li>
+<li><strong>Random gene sets matched for size and expression.</strong> In breast cancer most random gene sets predict outcome {cite('venet')}; {N_FLOOR} per signature give its floor.</li>
+<li><strong>Clinical references.</strong> Age and stage, the PAM50 intrinsic subtype {cite('parker')} and the published 11-gene proliferation score {cite('nielsen')}.</li>
+</ul>"""
 
 
 def result_html():
     pp = {m: pv(fw_prim[m]["fw_p"]) for m in MODELS}
     ps = {m: pv(fw_sens[m]["fw_p"]) for m in MODELS}
-    kp = {m: pv(fw_prim[m]["pick_fw_p"]) for m in MODELS}
-    ks = {m: pv(fw_sens[m]["pick_fw_p"]) for m in MODELS}
-    check(not any(fw[m]["pick_fw_p"] < C.ALPHA for fw in (fw_prim, fw_sens) for m in MODELS),
-          "no margin-selected pick clears the family-wise null")
-    m2 = {m: sgn(P2C["primary"][m]["margin"]) for m in FMS}
+    m2 = {m: P2C["primary"][m]["margin"] for m in FMS}
     ci2 = {m: ci(*P2C["primary"][m]["ci"]) for m in FMS}
-    near0 = [m for m in P2_BELOW if P2C["primary"][m]["ci"][1] > -0.005]
-    below_txt = "".join(f"; {NAME[m]}'s interval lies below zero, with its upper bound {sgn(P2C['primary'][m]['ci'][1])} "
-                        f"near zero" if m in near0 else f"; {NAME[m]}'s interval lies below zero" for m in P2_BELOW)
-    borderline = [m for m in MODELS if fw_sens[m]["fw_p_borderline"]]
-    bl = (f" ({' and '.join(NAME[m] for m in borderline)} within two Monte-Carlo standard errors of 0.05)" if borderline else "")
-    bp, sp_ = PICKS["primary"]["hvg_pca"], PICKS["primary"]["scgpt"]
-    check(sp_["cindex"] > bp["cindex"] and sp_["floor_mean"] > bp["floor_mean"], "scGPT's pick: higher C and higher floor")
     ms = {m: sgn(P2C["sensitivity"][m]["margin"]) for m in FMS}
     check(all(P2C["sensitivity"][m]["ci"][0] < 0 < P2C["sensitivity"][m]["ci"][1] for m in FMS),
           "sensitivity margins span zero")
     clin = REF["clinical_full"]
-    pam = REF["pam50"]
-    prol = AV_PROLIF["age+stage"]
-    os_p = mrep(PROLIF_ID, "OS")
-    ds_p = mrep(PROLIF_ID, "DSS")
-    lumA = SC_P3["LumA"]["OS"]
-    pam_set, pam_base = SM["clinical_pam50"], SM["clinical_on_pam50_set"]
-    gf_dss = PID["primary"]["geneformer"]
-    check([(a, m, ep) for a in PICKS for m in FMS for ep in ("OS", "DSS") if mrep(PID[a][m], ep)["replicates"]]
-          == [("primary", "geneformer", "DSS")], "the only foundation-model pick that replicates is Geneformer's risk pick on DSS")
-    check(floor_borderline(gf_dss, "DSS"), "Geneformer's DSS replication is within Monte-Carlo error of its floor p95")
-    f1 = (f"<p><strong>No representation beats chance selection in the pre-specified direction.</strong> The largest C-index in "
-          f"each representation's family of {min(N_SIGS.values())}–{max(N_SIGS.values())} signatures stays inside its "
-          f"family-wise null (p = {pp['hvg_pca']} HVG-PCA, {pp['scgpt']} scGPT, {pp['geneformer']} Geneformer). Read in the "
-          f"direction each signature acts (post hoc), the family maxima of HVG-PCA (p = {ps['hvg_pca']}) and scGPT "
-          f"(p = {ps['scgpt']}) clear their nulls and Geneformer's (p = {ps['geneformer']}) does not{bl}. The margin-selected "
-          f"picks shown in the figures do not clear the null in either reading (p = {ks['hvg_pca']}, {ks['scgpt']} and "
-          f"{ks['geneformer']} either direction; {kp['hvg_pca']}, {kp['scgpt']} and {kp['geneformer']} pre-specified). "
-          f"No foundation-model pick is further above its random-gene floor than the baseline's pick; in the pre-specified "
-          f"reading the margins are {m2['scgpt']} for scGPT (95% interval {ci2['scgpt']}) and {m2['geneformer']} for "
-          f"Geneformer ({ci2['geneformer']}){below_txt}. scGPT's pick has the higher C-index ({f3(sp_['cindex'])} against "
-          f"{f3(bp['cindex'])}) and also the higher floor ({f3(sp_['floor_mean'])} against {f3(bp['floor_mean'])}); the "
-          f"baseline pick it is measured against is the single-dataset state described below and does not itself beat "
-          f"chance (p = {kp['hvg_pca']}). Against the baseline's luminal sensitivity pick the margins are {ms['scgpt']} and "
-          f"{ms['geneformer']}, with intervals spanning zero.</p>")
-    f2 = (f"<p><strong>No pick adds to age and stage.</strong> Age and stage alone reach a "
-          f"cross-validated C-index of {f3(clin['cindex_cv_mean'])} ({n_(clin['n'])} patients); the PAM50 subtype call alone "
-          f"reaches {f3(pam['cindex_cv_mean'])} ({n_(pam['n'])} patients). With the signature re-selected inside every training "
-          f"fold, adding a pick changes the cross-validated C-index by {sgn(min(NESTED_PICK), 4)} to {sgn(max(NESTED_PICK), 4)}, "
-          f"and every pick's change spans zero across the five repeats; the published 11-gene proliferation score adds "
-          f"{sgn(prol['delta_cindex_cv_nested_mean'])}. In this cohort PAM50 subtype adds nothing to age and stage either "
-          f"({f3(pam_set['cindex_mean'])} against {f3(pam_base['cindex_mean'])} on the {n_(pam_set['n'])} patients with a "
-          f"call), so the test has little room to show added value.</p>")
-    f3_ = (f"<p><strong>The replication in METABRIC points the same way.</strong> With signatures and directions frozen before "
-           f"its outcomes were read, every foundation-model-minus-baseline margin is negative (intervals below zero: "
-           f"{len(BELOW_PRIM)} of {len(CMP_PRIM)} pre-specified, {len(CMP_SENS)} of {len(CMP_SENS)} post hoc). The published "
-           f"proliferation score replicates most strongly (OS C = {f3(os_p['cindex_oriented'])} against a floor 95th "
-           f"percentile of {f3(os_p['floor_p95'])}; disease-specific survival (DSS) C = {f3(ds_p['cindex_oriented'])}). Both "
-           f"HVG-PCA picks replicate. Of the foundation-model picks only Geneformer's risk pick meets the criterion, on DSS "
-           f"and by {sgn(gap(gf_dss, 'DSS'), 4)} (borderline). Within luminal A tumours scGPT's protective pick has "
-           f"C = {f3(lumA['cindex_oriented'])} (outcome-permutation p = {pv(lumA['perm_p'])}; no random-gene floor, and not a "
-           f"pre-specified replication criterion); Geneformer's protective pick does not replicate.</p>")
-    return f"""<h2 id="result">Key result</h2>
-{figure("fig_ladder", "Figure 1")}
+    f1 = (f"<p><strong>No representation beats chance selection.</strong> In the pre-specified risk direction the best "
+          f"of each representation's signatures stays inside its family-wise null (p = {pp['hvg_pca']} HVG-PCA, "
+          f"{pp['scgpt']} scGPT, {pp['geneformer']} Geneformer). Read in either direction (post hoc), HVG-PCA "
+          f"(p = {ps['hvg_pca']}) and scGPT ({ps['scgpt']}) clear it; Geneformer ({ps['geneformer']}) does not, a "
+          f"borderline result {GF_Z:.1f} Monte-Carlo standard errors above 0.05.</p>")
+    f2 = (f"<p><strong>Neither foundation model is ahead of the baseline.</strong> Measured as distance above the "
+          f"random-gene floor, scGPT's pick trails the baseline's by {f3(-m2['scgpt'])} in C-index (95% interval "
+          f"{ci2['scgpt']}) and Geneformer's by {f3(-m2['geneformer'])} ({ci2['geneformer']}). Read in either "
+          f"direction the margins are {ms['scgpt']} and {ms['geneformer']}, with intervals spanning zero.</p>")
+    f3_ = (f"<p><strong>Clinical information is far ahead.</strong> Age and stage alone reach a cross-validated "
+           f"C-index of {f3(clin['cindex_cv_mean'])}. The picks reach {f3(min(PICK_C))}–{f3(max(PICK_C))} alone, "
+           f"selected on these patients; the published proliferation score, with no selection, reaches "
+           f"{f3(PROLIF['cindex'])}.</p>")
+    check(all(m2[m] < 0 for m in FMS) and all(c < clin["cindex_cv_mean"] for c in PICK_C), "result cards")
+    return f"""<h2 id="result">Headline result</h2>
+{fig("fig_ladder")}
 <div class="findings">{f1}{f2}{f3_}</div>"""
 
 
-def states_html():
-    rows_ = []
-    for a in ("primary", "sensitivity"):
-        for m in MODELS:
-            r = PICKS[a][m]
-            c = state_comp(r)
-            key = f"{a}/{m}"
-            direction = r.get("direction", "risk")
-            prog_genes = ", ".join(PROGRAMME_GENES[key])
-            k = r["signature"].split("_k")[1]
-            rows_.append(
-                f'<tr><td>{sw(m)}<strong>{NAME[m]}</strong><br><span class="dim2">{"pre-specified" if a == "primary" else "sensitivity"}'
-                f' · <span class="mono">{r["resolution"]:.1f}/{r["signature"]}</span></span></td>'
-                f'<td><strong>{esc(programme(a, m))}</strong><br><span class="dim2">{esc(prog_genes)}</span></td>'
-                f'<td>{n_(c["n_cells"])} cells<br><span class="dim2">{c["n_donors"]} donors ({pct(float(c["top_donor_frac"]))}), '
-                f'{c["n_datasets"]} dataset{"" if c["n_datasets"] == "1" else "s"} ({pct(float(c["top_dataset_frac"]))})<br>'
-                f'{esc(c["top_cell_type"])} {pct(float(c["top_cell_type_frac"]))}<br>'
-                f'ribosomal genes: {pct(float(c[f"ribo_frac_k{k}"]))} of the signature</span></td>'
-                f'<td class="genes">{", ".join(top_markers(r))}</td>'
-                f'<td>{direction}</td><td class="num">{f3(r["cindex"])}</td></tr>')
-    table = ('<div class="scroll"><table class="states"><thead><tr><th>pick</th>'
-             '<th>programme, and the genes that name it</th><th>composition in the atlas</th>'
-             '<th>top-ranked markers (ribosomal genes omitted)</th>'
-             '<th>direction</th><th>TCGA C</th></tr></thead><tbody>' + "".join(rows_) + "</tbody></table></div>")
-    b = PICKS["primary"]["hvg_pca"]
-    sds = SINGLE_DONOR_STATES
-    share = {k: pct(float(state_comp(PICKS[a][m])["top_donor_frac"])) for k, (a, m) in
-             {"gf": ("primary", "geneformer"), "hs": ("sensitivity", "hvg_pca"), "hp": ("primary", "hvg_pca")}.items()}
-    frac = {m: sds[m][0] / sds[m][1] for m in MODELS}
-    check(all(frac[m] < frac["hvg_pca"] for m in FMS), "the foundation models have fewer single-donor states than HVG-PCA")
-    return f"""<h2 id="states">What the cell states are</h2>
-<p class="sub">Each representation's pick is the state whose signature lies furthest above its own random-gene floor: in the risk direction for the pre-specified analysis, in either direction for the sensitivity analysis. Composition is from the {n_(N_CELLS)}-cell atlas; markers are ranked by a Wilcoxon test of the state against all other cells.</p>
-{table}
-<p class="note">Composition: donors and datasets with, in brackets, the share of the state's cells from the largest one, then the most frequent annotated cell type and its share. A state is flagged single-donor when one donor supplies at least {pct(C.SINGLE_DONOR_FRAC)} of its cells. ER, PR: oestrogen and progesterone receptor; HER2: the ERBB2 gene product.</p>
-<p><strong>Most picks are tumour-cell programmes that follow the intrinsic subtypes.</strong> In the risk direction, scGPT's pick is an ERBB2-containing luminal epithelial programme and Geneformer's a basal keratin programme. In the protective direction, HVG-PCA and scGPT both recover a luminal, oestrogen-responsive programme (GATA3, XBP1, AZGP1, TRPS1 in both lists). Their marker lists contain genes of the subtype axes that carry most prognostic information in breast cancer {cite("wirapati")}, so their bulk scores are expected to track PAM50 subtype; that association was not measured here. Malignant cells cluster by patient in single-cell data {cite("tirosh")}: Geneformer's pre-specified pick ({share['gf']} of its cells from one donor) and HVG-PCA's sensitivity pick ({share['hs']}) are essentially one patient's tumour cells, and HVG-PCA's pre-specified pick ({share['hp']}) is the single-dataset state below. Across all kept states, {sds['hvg_pca'][0]} of {sds['hvg_pca'][1]} HVG-PCA, {sds['scgpt'][0]} of {sds['scgpt'][1]} scGPT and {sds['geneformer'][0]} of {sds['geneformer'][1]} Geneformer states are single-donor: the foundation models group cells across patients more often than HVG-PCA without batch correction does, and this did not make their signatures more prognostic in bulk.</p>
-<p><strong>The baseline's pre-specified pick is a single-dataset artefact.</strong> Its cells are annotated as exhausted T cells, yet its markers are testis and colon genes (CEACAM7, TKTL1, FAM9C, INSL3), and none of the canonical T-cell markers ({", ".join(T_CELL_GENES)}) is among its 50 genes; it does include {", ".join(BASE_EXTRA_GENES["treg"])}, a regulatory-T-cell transcription factor, and the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}. It was picked because its random-gene floor is low ({f3(b["floor_mean"])}), which makes its margin large although its C-index ({f3(b["cindex"])}) is not. The pre-specified P2 margins are measured against it.</p>
-<p><strong>Geneformer's protective pick is a mixed-lineage state.</strong> Its markers are nuclear-retained transcripts and immediate-early genes, the profile of low-quality or dissociation-stressed cells.</p>
-<p>Figure 2 places the picks in each representation's two-dimensional uniform manifold approximation and projection (UMAP) of all {n_(N_CELLS)} cells.</p>
-{figure("fig_states", "Figure 2")}"""
-
-
-def clinical_html():
+def added_html():
+    prol = AV_PROLIF["age+stage"]["delta_cindex_cv_nested_mean"]
+    prolp = AV_PROLIF["age+stage+PAM50"]["delta_cindex_cv_nested_mean"]
     nas, eas = AV_N["age+stage"]
-    nap, eap = AV_N["age+stage+PAM50"]
-    prol = AV_PROLIF["age+stage"]
-    prolp = AV_PROLIF["age+stage+PAM50"]
-    lum = [AV_PICKS[("sensitivity", m, b)] for m in ("hvg_pca", "scgpt") for b in ("age+stage", "age+stage+PAM50")]
-    check(all(r["hr_ci_hi"] < 1 for r in lum), "the luminal protective picks keep nominal HR < 1 with and without PAM50")
-    nfeat = STR["features"]
-    spread = max(max(AGE_STAGE_CVS) - min(AGE_STAGE_CVS), max(PAM_CLIN_CVS) - min(PAM_CLIN_CVS))
-    return f"""<h2 id="clinical">Does anything add to clinical information?</h2>
-<p class="sub">Each pick is added to a Cox proportional-hazards model of age and stage ({n_(nas)} patients, {eas} deaths) and to age, stage and PAM50 subtype ({n_(nap)} patients, {eap} deaths). The ladder's C-indices are of the score alone; this section asks whether the score adds to what a clinician already has.</p>
-{figure("fig_added_value", "Figure 3")}
-<p>The hazard ratios are nominal: every pick was chosen on the outcomes of these patients. The change in cross-validated C-index repeats the selection, and the choice of direction, inside every training fold, so it carries no selection. On that measure every pick's change in C spans zero across the five repeats. The luminal protective picks of HVG-PCA and scGPT keep nominal hazard ratios below 1 with PAM50 in the model ({f3(lum[1]["hr_per_sd"], 2)} and {f3(lum[3]["hr_per_sd"], 2)} per standard deviation), but under nested selection they do not raise the cross-validated C-index. The published proliferation score (a fixed, published gene list, so free of selection) adds {sgn(prol["delta_cindex_cv_nested_mean"])} to age and stage and nothing once PAM50 is in the model ({sgn(prolp["delta_cindex_cv_nested_mean"])}). Of the family maxima, only HVG-PCA's either-direction maximum adds under nested selection ({sgn(FAMMAX_HVG_AS)}), and it too stops adding once PAM50 is in the model.</p>
-<h3>All of a representation's states at once</h3>
-<p>A ridge-penalised Cox model with every state of a representation (50-gene signatures: {nfeat['hvg_pca']} HVG-PCA, {nfeat['scgpt']} scGPT, {nfeat['geneformer']} Geneformer) plus age and stage does not improve on age and stage alone (Figure 4); differences of a few thousandths are within the spread across fold seeds. Gradient-boosted survival models (XGBoost, Cox objective, fixed hyperparameters) fall below age and stage alone with every representation's states ({f3(XGB_RANGE[0])}–{f3(XGB_RANGE[1])}), so they are not read as a comparison between representations. Adding PAM50 subtype to age and stage does not raise the cross-validated C either.</p>
-<p class="note">Models within one section share their cross-validation folds; sections use different fold seeds, so the same model can differ by up to {f3(spread)} between sections (age + stage {f3(min(AGE_STAGE_CVS))}–{f3(max(AGE_STAGE_CVS))}; PAM50 + age + stage {f3(min(PAM_CLIN_CVS))} and {f3(max(PAM_CLIN_CVS))}).</p>
-{figure("fig_stratify", "Figure 4")}"""
+    check(prol > 0 and prolp <= 0, "proliferation raises C over age + stage, not once PAM50 is in")
+    return f"""<h2 id="added">Added value over age and stage</h2>
+{fig("fig_added_value")}
+<p>Each pick was added to a Cox model of age and stage ({n_(nas)} patients, {eas} deaths), with the signature re-selected inside every training fold so that the selection is paid for. No pick showed a reproducible improvement: the change in cross-validated C-index ranged from {sgn(min(NESTED_PICK), 4)} to {sgn(max(NESTED_PICK), 4)}, and every pick's change spans zero across five repeats. The published proliferation score raised it by {sgn(prol)}; once PAM50 subtype was in the model its change was {sgn(prolp)}.</p>"""
 
 
 def replication_html():
-    os_, ds_ = MEND["OS"], MEND["DSS"]
-    check(all(k in M["criterion"] for k in ("floor p95", "age-adjusted, cohort-stratified HR", "TCGA direction", f"p < {C.ALPHA}")),
-          "the replication criterion stated on the page is the one in metabric.json")
-    BL = ' <span class="dim2">(borderline)</span>'
-
-    def ep_cells(sid, ep):
-        e = mrep(sid, ep)
-        return (f'<td class="num">{f3(e["cindex_oriented"])}</td><td class="num">{f3(e["floor_p95"])}</td>'
-                f'<td class="num">{f3(e["hr_per_sd"], 2)} ({pv(e["p"])})</td>'
-                f'<td>{yesno(e["replicates"])}{BL if floor_borderline(sid, ep) else ""}</td>')
-
-    sigrows = [(PID[a][m], f'{sw(m)}{NAME[m]}', f'{"pre-specified" if a == "primary" else "sensitivity"} · {esc(programme(a, m))}')
-               for a in ("primary", "sensitivity") for m in MODELS]
-    sigrows.append((PROLIF_ID, f'{sw("prolif")}Proliferation score', "published reference"))
-    os_rows, ds_rows = [], []
-    for sid, rep, lab in sigrows:
-        s_ = MSIG[sid]
-        cls = ' class="ref"' if sid == PROLIF_ID else ""
-        os_rows.append(f'<tr{cls}><td>{rep}</td><td>{lab}</td><td class="num">{pct(s_["coverage"])}</td>{ep_cells(sid, "OS")}</tr>')
-        sub = ""
-        if s_.get("p3"):
-            st, v = next(iter(s_["p3"].items()))
-            sub = f'{SUBTYPE.get(st, st)}: C {f3(v["OS"]["cindex_oriented"])}, p {pv(v["OS"]["perm_p"])}'
-        ds_rows.append(f'<tr{cls}><td>{rep}</td><td>{lab}</td>{ep_cells(sid, "DSS")}<td>{sub}</td></tr>')
-    head = '<th>C</th><th>floor p95</th><th>HR/SD (p)</th><th>replicates</th>'
-    table = ('<details class="every"><summary>Numbers behind figure 5 for the six picks and the reference</summary><div class="inner">'
-             '<p class="tcap">Overall survival</p>'
-             '<div class="scroll"><table><thead><tr><th>representation</th><th>pick</th><th>genes measured</th>'
-             + head + '</tr></thead><tbody>' + "".join(os_rows) + '</tbody></table></div>'
-             '<p class="tcap">Disease-specific survival, and overall survival within the TCGA lead subtype</p>'
-             '<div class="scroll"><table><thead><tr><th>representation</th><th>pick</th>'
-             + head + '<th>within subtype, OS (no floor)</th></tr></thead><tbody>' + "".join(ds_rows) + '</tbody></table></div>'
-             '<p class="note">C is read in the direction fixed in TCGA. Floor p95: 95th percentile of '
-             f'{FROZ["n_floor_sets"]} matched random gene sets in METABRIC. HR/SD: age-adjusted hazard ratio per standard '
-             'deviation of the score in that direction, stratified by METABRIC cohort. Borderline: C within two approximate '
-             'Monte-Carlo standard errors of the floor p95 (normal approximation from the floor mean and p95). Within-subtype '
-             f'p: {n_(FROZ["n_perm_p3"])} outcome permutations; {pv(1 / (FROZ["n_perm_p3"] + 1))} is the smallest value '
-             'attainable.</p></div></details>')
-    gf = PID["primary"]["geneformer"]
-    lumA = SC_P3["LumA"]["OS"]
-    hi = sorted({sid for sid, _ in HIGH_HR_NO})
-    check(hi and all(sid.split(":")[0] in NAME for sid in hi), "high-HR signatures that fail the floor are named")
-    pick_ids = {PID[a][m] for a in PID for m in MODELS}
-    hi_txt = ", ".join(f"{NAME[sid.split(':')[0]]}'s {'protective' if sid.endswith('protective') else 'risk'} "
-                       f"{'pick' if sid in pick_ids else 'family maximum'} "
-                       f"({' and '.join(ep for s2, ep in HIGH_HR_NO if s2 == sid)})" for sid in hi)
-    base = PID["primary"]["hvg_pca"]
-    check(all(mrep(base, ep)["replicates"] for ep in ("OS", "DSS")), "the baseline's artefact pick replicates")
+    os_ = MEND["OS"]
+    os_p = mrep(PROLIF_ID, "OS")
     return f"""<h2 id="replication">Independent replication in METABRIC</h2>
-<p class="sub">The signatures, their directions and the replication criterion were fixed before METABRIC outcomes were examined.</p>
-<p>METABRIC {cite("curtis", "pereira")} is an expression-microarray cohort with long follow-up: {n_(os_['n'])} patients, {n_(os_['events'])} deaths (OS). Disease-specific survival (DSS) is the secondary endpoint; it censors deaths from other causes, leaving {n_(ds_['events'])} events. Twelve signatures were frozen with their genes and TCGA directions: the six picks, the family maxima and the proliferation reference. A signature replicates on an endpoint if its C, read in the TCGA direction, exceeds the 95th percentile of its METABRIC floor and its age-adjusted hazard ratio, stratified by METABRIC cohort, points in the TCGA direction with p &lt; {C.ALPHA}.</p>
-{figure("fig_replication", "Figure 5")}
+{fig("fig_margin")}
+<p>The signatures, their directions and the replication criterion were fixed before METABRIC outcomes were examined. In {n_(os_['n'])} METABRIC patients ({n_(os_['events'])} deaths) {cite('curtis', 'pereira')}, every foundation-model-minus-baseline margin is negative; the 95% interval lies below zero for {WORD[len(BELOW_PRIM)]} of the {WORD[len(CMP_PRIM)]} pre-specified comparisons and for all {WORD[len(CMP_SENS)]} post hoc ones. The published proliferation score replicates most strongly (overall-survival C-index {f3(os_p['cindex_oriented'])} against a random-gene 95th percentile of {f3(os_p['floor_p95'])}).</p>"""
+
+
+def cellstates_html():
+    rows_ = []
+    for a in ("primary", "sensitivity"):
+        for m in MODELS:
+            t, mb = SUB[(a, m)]
+            c = state_comp(PICKS[a][m])
+            auc = float(t["auc_tracked"])
+            g = GROUP[t["tracked_group"]]
+            tracks = (f"{'higher' if auc >= 0.5 else 'lower'} in {g} (AUC {f3(auc, 2)})"
+                      if (a, m) in TRACKERS else "little association")
+            rows_.append(f'<tr><td>{sw(m)}<strong>{NAME[m]}</strong><br><span class="dim2">'
+                         f'{"pre-specified" if a == "primary" else "post hoc"} · {PICKS[a][m].get("direction", "risk")}</span></td>'
+                         f'<td>{esc(programme(a, m))}</td><td>{tracks}</td>'
+                         f'<td class="num">{f3(float(t["epsilon2"]), 2)} · {f3(float(mb["epsilon2"]), 2)}</td>'
+                         f'<td class="num">{pct(float(c["top_donor_frac"]))}</td></tr>')
+    table = ('<div class="scroll"><table class="brief"><thead><tr><th>pick</th><th>programme</th>'
+             '<th>PAM50 subtype it tracks (TCGA)</th><th>ε² TCGA · METABRIC</th><th>cells from largest donor</th>'
+             '</tr></thead><tbody>' + "".join(rows_) + '</tbody></table></div>')
+    d = DPR
+    lo, hi = min(STAB_ARI), max(STAB_ARI)
+    return f"""<h2 id="cellstates">What the states are</h2>
+<p>Four of the six picks are tumour-cell programmes whose bulk scores follow the intrinsic subtypes of breast cancer, in TCGA and again in METABRIC. The baseline's pre-specified pick is a single-dataset artefact, and Geneformer's protective pick a stress profile.</p>
 {table}
-<p><strong>Verdict.</strong> The replication shows no foundation-model advantage (figure 6). Geneformer's risk pick meets the criterion on DSS by {sgn(gap(gf, 'DSS'), 4)}, within Monte-Carlo error of the floor p95. Within luminal A tumours scGPT's protective pick has C = {f3(lumA['cindex_oriented'])} with outcome-permutation p = {pv(lumA['perm_p'])}; no random-gene floor was computed within subtypes, so this is a result, not a pre-specified replication.</p>
-<p><strong>Random gene sets predict survival in METABRIC.</strong> With {n_(os_['events'])} deaths, the matched-random floors have 95th percentiles of {f3(FLOOR_RANGE[0], 2)}–{f3(FLOOR_RANGE[1], 2)}. Some signatures have hazard-ratio p-values below 10<sup>{MINUS}5</sup> and still do not beat random genes: {hi_txt}. This is the effect described by {REFS["venet"][0]}.</p>
-<p><strong>The baseline's artefact pick replicates on both endpoints.</strong> Why it replicates was not examined; its 50 genes include the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}.</p>
-{figure("fig_margin", "Figure 6")}"""
+<p class="note">ε²: rank-based effect size of PAM50 subtype on the signature score (0: no association; the published proliferation score has {f3(float(SUB_REF[0]['epsilon2']), 2)}). AUC: probability that a tumour of that subtype scores higher than one of another subtype.</p>
+<p><strong>Secondary result: donor mixing.</strong> The foundation-model embeddings produced fewer donor-specific states than HVG-PCA ({pct(d['scgpt']['share_single_donor'])} of scGPT and {pct(d['geneformer']['share_single_donor'])} of Geneformer states draw at least {pct(C.SINGLE_DONOR_FRAC)} of their cells from one donor, against {pct(d['hvg_pca']['share_single_donor'])}). This did not translate into clearly stronger prognostic signatures: the best multi-donor state lies {f3(d['scgpt']['best_margin_multi_donor'])} (scGPT) and {f3(d['geneformer']['best_margin_multi_donor'])} (Geneformer) above its floor, against {f3(d['hvg_pca']['best_margin_multi_donor'])} for HVG-PCA; read in either direction the foundation models lead by {f3(DON_OR_AHEAD['scgpt'])} and {f3(DON_OR_AHEAD['geneformer'])}, without an interval. The clusterings are stable under donor subsampling (mean adjusted Rand index {f3(lo, 2)}–{f3(hi, 2)}).</p>"""
 
 
-def approach_html():
+def novelty_html():
+    keys = ["luca", "wuSZ", "chenA", "sun", "roman", "liuW", "kedzierska", "ahlmann", "bendidi", "venet"]
+    check(all(k in REFS for k in keys), "every reference cited in the novelty section is in the reference list")
+    fm_or_dirs = {r["direction_tcga"] for r in SUBT_CSV if r["cohort"] == "TCGA" and r["model"] in SENS_CLEAR
+                  and "family_max_sensitivity" in r["analyses"].split(";")}
+    check(fm_or_dirs == {"protective"}, "the either-direction family maxima that clear are protective")
+    return f"""<h2 id="novelty">What is new, and what was known</h2>
+<p>We found no prior study that defines cell states with foundation models in a tumour single-cell atlas, carries them into an independent bulk cohort as marker-gene signatures, compares them with a linear HVG-PCA arm passed through the identical pipeline, reads every result against matched random gene sets and a family-wise permutation null, and replicates the frozen signatures in a second cohort; to our knowledge the combination is new.</p>
+<ul class="known">
+<li><strong>Single-cell states carried to bulk outcome.</strong> EcoTyper defined prognostic cell states across carcinomas {cite('luca')}. In breast cancer, {REFS['wuSZ'][0]} related single-cell ecotypes to bulk outcome, and {REFS['chenA'][0]}, whose collection supplies {pct(CHEN_FRAC)} of this atlas's cells, found that the states whose associations held across cohorts were protective. Scissor {cite('sun')} uses the outcome to choose cells.</li>
+<li><strong>Foundation models and clinical outcome.</strong> Twelve single-cell foundation models offered limited advantages over simpler baselines for cancer patients' outcomes within single-cell cohorts {cite('roman')}; TCGA survival has been predicted from foundation-model embeddings of bulk profiles {cite('liuW')}.</li>
+<li><strong>Linear baselines.</strong> Simple baselines match foundation models in zero-shot cell-level tasks {cite('kedzierska')} and perturbation prediction {cite('ahlmann', 'bendidi')}. Random gene sets predict breast-cancer outcome {cite('venet')}, the reason for the matched-random floor.</li>
+</ul>
+<p>The result agrees with the limited foundation-model advantage reported by {REFS['roman'][0]}, and the states that clear the null in the either-direction reading are protective, as were the cross-cohort survivors of {REFS['chenA'][0]}.</p>"""
+
+
+def scope_html():
+    return f"""<h2 id="scope">Why it matters, and what it does not show</h2>
+<p>For drug discovery and patient stratification the result is a caution: here, states from zero-shot foundation-model embeddings did not give better prognostic signatures than a linear method applied to the same cells. The conclusion is limited to the checkpoints tested, scGPT whole-human and the 6-layer Geneformer V1, used zero-shot; neither saw malignant cells in pretraining, and cancer-adapted checkpoints such as CancerFoundation {cite('theus')} were not tested. A marker-gene signature scored in bulk tumours is a lossy projection of a cell state, so the study tests whether the states transfer into bulk prognosis, not whether the embeddings contain prognostic information. It covers one indication, breast cancer, with {N_EV} deaths in TCGA and short follow-up.</p>"""
+
+
+def checked_html():
+    return f"""<h2 id="checked">How the analysis was checked</h2>
+<p>The four predictions and their tests are written out in the <a href="{DESIGN_URL}">design document</a>. The code was audited against that design, and every place where the reported analysis departs from it is listed with its reason under <a href="#corrections">deviations from the design</a>. Unit tests, continuous integration and <a href="#pipeline">three reproduction tiers</a>, from the distributed results up to a rebuild from scratch, cover the code.</p>"""
+
+
+# ----------------------------------------------------------------------------- technical detail
+def technical_html():
+    return """<h2 id="technical" class="divider">Technical detail</h2>
+<p class="sub">The full study: methods and controls, the predictions, every number behind the summary, the secondary analyses, the deviations from the design, and how to reproduce it.</p>"""
+
+
+def methods_html():
     hv = UNIVERSE_HVG
     check(DUPS["all_groups_same_donor"] and DUPS["all_groups_across_datasets"] and set(DUPS["group_sizes"]) == {"2"},
           "duplicates are pairs from one donor in two datasets")
@@ -913,8 +977,8 @@ def approach_html():
          f"HVG-PCA: the {n_(C.N_HVG)} most variable genes, log-normalised, reduced to {C.MODELS['hvg_pca']['n_comps']} principal "
          f"components fitted on this atlas. scGPT {cite('cui')}: the whole-human checkpoint, pretrained on non-malignant human "
          f"cells, cell embedding from its classification token. Geneformer {cite('theodoris')}: the 6-layer V1 model, "
-         f"pretrained on a corpus that excluded malignant cells, mean-pooled cell embedding. Both models run in bfloat16 on "
-         f"CPU."),
+         f"pretrained on a corpus that excluded malignant cells, mean-pooled cell embedding. Both models are used zero-shot "
+         f"and run in bfloat16 on CPU."),
         ("Find cell states",
          f"Leiden clustering {cite('traag')} of each representation's 15-nearest-neighbour graph at resolutions "
          f"{', '.join(str(r) for r in RESOLUTIONS)}; states with at least {MIN_CELLS} cells are kept: "
@@ -926,7 +990,7 @@ def approach_html():
         ("Score the signatures in TCGA-BRCA",
          f"Each of {n_(N_PAT)} primary tumours {cite('tcga')} gets one score per signature: the mean of the signature genes' "
          f"expression, each z-scored across patients. The ladder uses Harrell's C {cite('harrell')} of that score alone, without "
-         f"covariates. A Cox model with age and stage gives each pick's hazard ratio, reported separately (Figure 3)."),
+         f"covariates. A Cox model with age and stage gives each pick's hazard ratio, reported separately ({fr('fig_added_value')})."),
         ("Pick and read",
          f"Each representation's pick is the signature furthest above its own random-gene floor across all nine settings "
          f"(three resolutions × three marker counts), chosen on TCGA outcomes. The family-wise null tests the family "
@@ -936,19 +1000,13 @@ def approach_html():
          f"the pick in every resample gives the P2 margins. P1–P4 are then read off the ladder."),
     ]
     steps_html = "".join(f'<div class="step"><h3>{t}</h3><p>{d}</p></div>' for t, d in steps)
-    return f"""<h2 id="approach">Approach</h2>
-<p class="sub">The three representations share everything except the representation itself: the cells, the clustering method, the marker ranking, the gene universe, the scoring and the survival statistics.</p>
-{panel(fig_cohorts(), "Three cohorts (OS: overall survival; PFI: progression-free interval; DSS: disease-specific survival)", "cards")}
-{panel(fig_flow(), "One atlas, three views, one patient cohort, one ladder")}
-<div class="steps">{steps_html}</div>"""
-
-
-def controls_html():
     clin, pam, pc, cf = REF["clinical"], REF["pam50"], REF["pam50_clinical"], REF["clinical_full"]
     rungs = [
-        ("null", f"Survival outcomes permuted across patients {N_PERM} times. In each permutation the largest C-index among all of a "
-                 f"representation's {min(N_SIGS.values())}–{max(N_SIGS.values())} signatures is kept, so the null includes the "
-                 f"selection of a winner. The family-wise p of the observed maximum is read against it."),
+        ("null", f"Survival outcomes permuted across patients {n_(N_PERM)} times. In each permutation the largest C-index among "
+                 f"all of a representation's {min(N_SIGS.values())}–{max(N_SIGS.values())} signatures is kept, so the null "
+                 f"includes the selection of a winner. The family-wise p of the observed maximum is read against it, with its "
+                 f"Monte-Carlo standard error; a p within two standard errors of 0.05 is marked borderline. The design "
+                 f"specified {N_PERM_DESIGN} permutations; the results keep both sets, which agree on every verdict."),
         ("floor", f"{N_FLOOR} random gene sets per signature, matched for size and for mean-expression decile. In breast cancer "
                   f"most random gene sets are associated with outcome, largely through proliferation {cite('venet')}; the floor "
                   f"is what a gene list of that composition scores."),
@@ -963,8 +1021,12 @@ def controls_html():
                        f"5 × 5-fold."),
     ]
     rungs_html = "".join(f"<tr><td>{r}</td><td>{d}</td></tr>" for r, d in rungs)
-    return f"""<h2 id="controls">Controls</h2>
-<p class="sub">Every C-index sits on a ladder of controls, and findings are stated as distances between rungs.</p>
+    return f"""<h2 id="methods">Methods and controls</h2>
+<p class="sub">The three representations share everything except the representation itself: the cells, the clustering method, the marker ranking, the gene universe, the scoring and the survival statistics.</p>
+{panel(fig_cohorts(), "Three cohorts (OS: overall survival; PFI: progression-free interval; DSS: disease-specific survival)", "cards")}
+<div class="steps">{steps_html}</div>
+<h3>The ladder of controls</h3>
+<p>Every C-index sits on a ladder of controls, and findings are stated as distances between rungs.</p>
 {panel(fig_ladder_schematic(), "The ladder (rung positions illustrative)")}
 <table class="rungs"><tbody>{rungs_html}</tbody></table>
 <h3>What the baseline controls for</h3>
@@ -981,10 +1043,9 @@ def predictions_html():
     p4c = L["p4_corrected"]["primary"]
     check(all(p4c[m]["P4_corrected"] is None for m in FMS), "P4 is not applicable")
     check(not any(v[m]["P2_corrected"] for m in FMS), "P4 is not tested because P2 fails")
-    p4_dev = [d["now_reported"] for d in L["deviations"] if d["id"] == "P4_gate"]
-    check(p4_dev and "hypergeometric HVG-depletion test" in p4_dev[0] and "ranked among the baseline" in p4_dev[0],
-          "the P4 test described on the page is the one in ladder.json")
     dev = {d["id"]: d["now_reported"] for d in L["deviations"]}
+    check("hypergeometric HVG-depletion test" in dev["P4_gate"] and "ranked among the baseline" in dev["P4_gate"],
+          "the P4 test described on the page is the one in ladder.json")
     check("maximising signature above its floor" in dev.get("P1_statistic", "") and f"< {C.ALPHA}" in dev["P1_statistic"],
           "the P1 rule on the page is the one in ladder.json")
     check("lower 2.5% bound > 0" in dev.get("P2_margin", ""), "the P2 rule on the page is the one in ladder.json")
@@ -994,7 +1055,7 @@ def predictions_html():
     rows_ = [
         ("P1", "Foundation-model signatures reach a C-index above the floor, each read against the family-wise "
                "permutation null.",
-         f"The family maximum's family-wise p against {N_PERM} outcome permutations; passes if p&nbsp;&lt;&nbsp;{C.ALPHA} and "
+         f"The family maximum's family-wise p against {n_(N_PERM)} outcome permutations; passes if p&nbsp;&lt;&nbsp;{C.ALPHA} and "
          f"the maximising signature lies above its random-gene floor.",
          two("P1_corrected")),
         ("P2", "Foundation-model signatures exceed HVG-PCA signatures by a margin whose bootstrap interval excludes zero.",
@@ -1025,7 +1086,51 @@ def flag(b, on, off, borderline):
     return yesno(b, on, off) + (' <span class="dim2">(borderline)</span>' if borderline else "")
 
 
-def sensitivity_html():
+def ladder_html():
+    kp = {m: pv(fw_prim[m]["pick_fw_p"]) for m in MODELS}
+    ks = {m: pv(fw_sens[m]["pick_fw_p"]) for m in MODELS}
+    check(not any(fw[m]["pick_fw_p"] < C.ALPHA for fw in (fw_prim, fw_sens) for m in MODELS),
+          "no margin-selected pick clears the family-wise null")
+    bp, sp_ = PICKS["primary"]["hvg_pca"], PICKS["primary"]["scgpt"]
+    check(sp_["cindex"] > bp["cindex"] and sp_["floor_mean"] > bp["floor_mean"], "scGPT's pick: higher C and higher floor")
+    near0 = [m for m in P2_BELOW if P2C["primary"][m]["ci"][1] > -0.005]
+    below_txt = "".join(f" {NAME[m]}'s interval lies below zero, with its upper bound {sgn(P2C['primary'][m]['ci'][1])} near zero."
+                        if m in near0 else f" {NAME[m]}'s interval lies below zero." for m in P2_BELOW)
+    pre = (f"<p>The family maxima of all three representations stay inside their family-wise nulls in the pre-specified "
+           f"direction, and the margin-selected picks shown in {fr('fig_ladder')} do not clear the null in either reading "
+           f"(p = {kp['hvg_pca']}, {kp['scgpt']} and {kp['geneformer']} pre-specified; {ks['hvg_pca']}, {ks['scgpt']} and "
+           f"{ks['geneformer']} either direction).{below_txt} scGPT's pick has the higher C-index ({f3(sp_['cindex'])} "
+           f"against {f3(bp['cindex'])}) and also the higher floor ({f3(sp_['floor_mean'])} against {f3(bp['floor_mean'])}); "
+           f"the baseline pick it is measured against is the single-dataset state described below and does not itself "
+           f"beat chance (p = {kp['hvg_pca']}).</p>")
+    # per setting
+    fm_rows = [r for r in BYSET if r["model"] in FMS]
+    check(len(BYSET) == 27 and all(float(r["above_floor_minus_baseline"]) < 0 and float(r["above_floor_or_minus_baseline"]) < 0
+                                   for r in fm_rows),
+          "at every setting both foundation models' best margin is below the baseline's, in both readings")
+    min_set = min(BYSET, key=lambda r: float(r["setting_fw_p"]))
+    check(float(min_set["setting_fw_p"]) >= C.ALPHA, "no setting's best signature clears its own null (risk direction)")
+    srows = "".join(
+        f'<tr><td>{sw(r["model"])}{NAME[r["model"]]}</td><td class="num">{float(r["resolution"]):.1f}</td>'
+        f'<td class="num">{r["topk"]}</td><td class="num">{r["n_signatures"]}</td>'
+        f'<td class="num">{sgn(float(r["above_floor"]))}</td>'
+        f'<td class="num">{"" if r["model"] == "hvg_pca" else sgn(float(r["above_floor_minus_baseline"]))}</td>'
+        f'<td class="num">{pv(float(r["setting_fw_p"]))}</td>'
+        f'<td class="num">{sgn(float(r["above_floor_or"]))}</td>'
+        f'<td class="num">{"" if r["model"] == "hvg_pca" else sgn(float(r["above_floor_or_minus_baseline"]))}</td>'
+        f'<td class="num">{pv(float(r["setting_fw_p_or"]))}</td></tr>' for r in BYSET)
+    per_setting = (
+        '<details class="every"><summary>The ladder at each of the nine settings (resolution × marker count)</summary><div class="inner">'
+        '<div class="scroll"><table><thead><tr><th>representation</th><th>resolution</th><th>markers</th><th>signatures</th>'
+        '<th>best margin, risk</th><th>minus baseline</th><th>setting p, risk</th><th>best margin, either</th>'
+        '<th>minus baseline</th><th>setting p, either</th></tr></thead><tbody>' + srows + '</tbody></table></div>'
+        f'<p class="note">Best margin: the largest C above the random-gene floor among the setting\'s signatures. Setting p: '
+        f'the family-wise p of the setting\'s largest C against the null restricted to that setting ({N_PERM_DESIGN} '
+        f'permutations). At every setting both foundation models\' best margin is below the baseline\'s, in both readings; '
+        f'in the risk direction no setting clears its own null (smallest p = {pv(float(min_set["setting_fw_p"]))}, '
+        f'{NAME[min_set["model"]]} at resolution {float(min_set["resolution"]):.1f} with {min_set["topk"]} markers).</p>'
+        '</div></details>')
+    # sensitivity
     rows_ = []
     for m in MODELS:
         r = PICKS["sensitivity"][m]
@@ -1035,7 +1140,7 @@ def sensitivity_html():
                      f'<td class="num">{f3(r["cindex"])}</td><td class="num">{f3(r["floor_mean"])}</td>'
                      f'<td class="num">{pv(fw["pick_fw_p"])}</td>'
                      f'<td class="num">{f3(fw["stat"])}</td><td class="num">{pv(fw["fw_p"])}</td>'
-                     f'<td>{flag(fw["P1_corrected"], "clears", "does not clear", fw["fw_p_borderline"])}</td>'
+                     f'<td>{flag(fw["P1_corrected"], "clears", "does not clear", bl10k(fw))}</td>'
                      f'<td>{SUBTYPE[p3["argmax_subtype"]]}</td><td class="num">{f3(p3["stat"])}</td><td class="num">{pv(p3["p"])}</td>'
                      f'<td>{flag(p3["P3_pass"], "passes", "fails", p3["borderline"])}</td></tr>')
     table = ('<div class="scroll"><table class="sens"><thead><tr><th>representation</th><th>pick</th><th>C</th><th>floor</th>'
@@ -1048,38 +1153,337 @@ def sensitivity_html():
     check(P3C["picks"]["sensitivity/scgpt"]["argmax_subtype"] == "LumA", "scGPT's P3 lead is in luminal A")
     argmax_differs = [m for m in ("hvg_pca", "scgpt") if fw_sens[m]["stat"] != fw_sens[m]["pick_stat"]]
     check(argmax_differs == ["hvg_pca", "scgpt"], "for HVG-PCA and scGPT the family maximum is a different state from the pick")
-    return f"""<h2 id="sensitivity">Sensitivity analysis: direction of effect (post hoc)</h2>
-<p>The pre-specified analysis reads the C-index in one direction: a signature scores high only when a higher score means worse survival. Protective signatures are common and include the largest departures from 0.5 (C down to {f3(MIN_C)}). The sensitivity analysis reads every signature in the direction it acts on the full cohort; its floor is read the same way, and the family-wise null takes the largest max(C, 1 − C) over the same {N_PERM} permutations. P3 is tested for every representation, the baseline included, with {n_(P3_NPERM)} within-subtype permutations; pick and direction were fixed on the full cohort, which contains these patients.</p>
-{table}
-<p>The signatures that clear the null are the family maxima; for HVG-PCA and scGPT these are different states from the picks carried into added value, replication and Figure 7. P2 still fails for both foundation models in this reading, and none of the pre-specified picks passes P3 (p = {pv(min(prim_p3))}–{pv(max(prim_p3))}). Figure 7 shows the lead replicated signature as survival curves in TCGA, where it was selected: the {NAME[km['signature'].split(':')[0]]} sensitivity pick, chosen by the rule in its caption.</p>
-{figure("fig_km", "Figure 7")}"""
-
-
-def pfi_html():
-    rows_ = []
+    # PFI
+    LF = LP["family_wise_10k"]
+    prow = []
     for m in MODELS:
-        fp_, fs_ = LP["family_wise"]["primary"][m], LP["family_wise"]["sensitivity"][m]
+        fp_, fs_ = LF["primary"][m], LF["sensitivity"][m]
         p2 = LP["p2_corrected"]["primary"].get(m)
         p2s = (f'{sgn(p2["margin"])} ({ci(*p2["ci"])})' if p2 else "baseline")
-        rows_.append(f'<tr><td>{sw(m)}{NAME[m]}</td><td class="num">{pv(fp_["fw_p"])}</td>'
-                     f'<td>{flag(fp_["P1_corrected"], "clears", "does not clear", fp_["fw_p_borderline"])}</td>'
-                     f'<td class="num">{pv(fs_["fw_p"])}</td>'
-                     f'<td>{flag(fs_["P1_corrected"], "clears", "does not clear", fs_["fw_p_borderline"])}</td>'
-                     f'<td class="num">{p2s}</td></tr>')
-    check(not any(LP["family_wise"]["primary"][m]["P1_corrected"] for m in MODELS), "PFI: no pre-specified family clears")
+        prow.append(f'<tr><td>{sw(m)}{NAME[m]}</td><td class="num">{pv(fp_["fw_p"])}</td>'
+                    f'<td>{flag(fp_["P1_corrected"], "clears", "does not clear", bl10k(fp_))}</td>'
+                    f'<td class="num">{pv(fs_["fw_p"])}</td>'
+                    f'<td>{flag(fs_["P1_corrected"], "clears", "does not clear", bl10k(fs_))}</td>'
+                    f'<td class="num">{p2s}</td></tr>')
+    check(not any(LF["primary"][m]["P1_corrected"] for m in MODELS), "PFI: no pre-specified family clears")
     check(not any(LP["p2_corrected"][a][m]["P2_pass"] for a in ("primary", "sensitivity") for m in FMS), "PFI: P2 fails")
-    diff = [m for m in MODELS if LP["family_wise"]["sensitivity"][m]["P1_corrected"] != fw_sens[m]["P1_corrected"]]
-    check(diff == ["geneformer"] and LP["family_wise"]["sensitivity"]["geneformer"]["P1_corrected"]
-          and LP["family_wise"]["sensitivity"]["geneformer"]["fw_p_borderline"],
+    diff = [m for m in MODELS if LF["sensitivity"][m]["P1_corrected"] != fw_sens[m]["P1_corrected"]]
+    gf_pfi = LF["sensitivity"]["geneformer"]
+    check(diff == ["geneformer"] and gf_pfi["P1_corrected"] and bl10k(gf_pfi),
           "PFI differs from OS only for Geneformer either-direction, which clears (borderline)")
-    table = ('<div class="scroll"><table><thead><tr><th>representation</th><th>family-wise p, pre-specified</th>'
-             '<th>null (pre-specified)</th><th>family-wise p, either direction</th><th>null (either direction)</th>'
-             '<th>P2 margin, pre-specified (95% interval)</th></tr></thead>'
-             '<tbody>' + "".join(rows_) + "</tbody></table></div>")
-    return f"""<h2 id="pfi">Secondary endpoint: progression-free interval</h2>
-<p class="sub">The progression-free interval (PFI) is the secondary endpoint; in this cohort it has fewer events than OS ({LP['n_events']} against {N_EV}). It is analysed with the same statistics.</p>
+    ptable = ('<div class="scroll"><table><thead><tr><th>representation</th><th>family-wise p, pre-specified</th>'
+              '<th>null (pre-specified)</th><th>family-wise p, either direction</th><th>null (either direction)</th>'
+              '<th>P2 margin, pre-specified (95% interval)</th></tr></thead>'
+              '<tbody>' + "".join(prow) + "</tbody></table></div>")
+    return f"""<h2 id="ladder">The ladder in detail</h2>
+<p class="sub">{fr('fig_ladder')} in numbers, the either-direction reading, the progression-free interval and the ladder at each setting. Family-wise p-values are from {n_(N_PERM)} outcome permutations.</p>
+<h3>Pre-specified direction</h3>
+{pre}
+{per_setting}
+<h3>Either direction (post hoc sensitivity analysis)</h3>
+<p>The pre-specified analysis reads the C-index in one direction: a signature scores high only when a higher score means worse survival. Protective signatures are common and include the largest departures from 0.5 (C down to {f3(MIN_C)}). The sensitivity analysis reads every signature in the direction it acts on the full cohort; its floor is read the same way, and the family-wise null takes the largest max(C, 1 − C) over the same {n_(N_PERM)} permutations. P3 is tested for every representation, the baseline included, with {n_(P3_NPERM)} within-subtype permutations; pick and direction were fixed on the full cohort, which contains these patients.</p>
 {table}
-<p>The pattern is the same as for OS, with one difference: on PFI, Geneformer's either-direction family also clears its null (borderline), which it does not on OS.</p>"""
+<p>The signatures that clear the null are the family maxima; for HVG-PCA and scGPT these are different states from the picks carried into added value, replication and {fr('fig_km')}. Geneformer's family-wise p ({pv(fw_sens['geneformer']['fw_p'])}) lies {GF_Z:.1f} Monte-Carlo standard errors above 0.05: it does not clear, and the result is borderline. P2 still fails for both foundation models in this reading, and none of the pre-specified picks passes P3 (p = {pv(min(prim_p3))}–{pv(max(prim_p3))}). {fr('fig_km')} shows the lead replicated signature as survival curves in TCGA, where it was selected: the {NAME[km['signature'].split(':')[0]]} sensitivity pick, chosen by the rule in its caption.</p>
+{fig("fig_km")}
+<h3>Secondary endpoint: progression-free interval</h3>
+<p>The progression-free interval (PFI) has fewer events than OS in this cohort ({LP['n_events']} against {N_EV}) and is analysed with the same statistics. The pattern is the same as for OS, with one difference: on PFI, Geneformer's either-direction family clears its null (p = {pv(gf_pfi['fw_p'])}, borderline), which it does not on OS.</p>
+{ptable}"""
+
+
+def states_html():
+    rows_ = []
+    for a in ("primary", "sensitivity"):
+        for m in MODELS:
+            r = PICKS[a][m]
+            c = state_comp(r)
+            key = f"{a}/{m}"
+            direction = r.get("direction", "risk")
+            prog_genes = ", ".join(PROGRAMME_GENES[key])
+            k = r["signature"].split("_k")[1]
+            rows_.append(
+                f'<tr><td>{sw(m)}<strong>{NAME[m]}</strong><br><span class="dim2">{"pre-specified" if a == "primary" else "sensitivity"}'
+                f' · <span class="mono">{r["resolution"]:.1f}/{r["signature"]}</span></span></td>'
+                f'<td><strong>{esc(programme(a, m))}</strong><br><span class="dim2">{esc(prog_genes)}</span></td>'
+                f'<td>{n_(c["n_cells"])} cells<br><span class="dim2">{c["n_donors"]} donors ({pct(float(c["top_donor_frac"]))}), '
+                f'{c["n_datasets"]} dataset{"" if c["n_datasets"] == "1" else "s"} ({pct(float(c["top_dataset_frac"]))})<br>'
+                f'{esc(c["top_cell_type"])} {pct(float(c["top_cell_type_frac"]))}<br>'
+                f'ribosomal genes: {pct(float(c[f"ribo_frac_k{k}"]))} of the signature</span></td>'
+                f'<td class="genes">{", ".join(top_markers(r))}</td>'
+                f'<td>{direction}</td><td class="num">{f3(r["cindex"])}</td></tr>')
+    table = ('<div class="scroll"><table class="states"><thead><tr><th>pick</th>'
+             '<th>programme, and the genes that name it</th><th>composition in the atlas</th>'
+             '<th>top-ranked markers (ribosomal genes omitted)</th>'
+             '<th>direction</th><th>TCGA C</th></tr></thead><tbody>' + "".join(rows_) + "</tbody></table></div>")
+    b = PICKS["primary"]["hvg_pca"]
+    share = {k: pct(float(state_comp(PICKS[a][m])["top_donor_frac"])) for k, (a, m) in
+             {"gf": ("primary", "geneformer"), "hs": ("sensitivity", "hvg_pca"), "hp": ("primary", "hvg_pca")}.items()}
+    return f"""<h2 id="states">The picked states</h2>
+<p class="sub">Each representation's pick is the state whose signature lies furthest above its own random-gene floor: in the risk direction for the pre-specified analysis, in either direction for the sensitivity analysis. Composition is from the {n_(N_CELLS)}-cell atlas; markers are ranked by a Wilcoxon test of the state against all other cells.</p>
+{table}
+<p class="note">Composition: donors and datasets with, in brackets, the share of the state's cells from the largest one, then the most frequent annotated cell type and its share. A state is flagged single-donor when one donor supplies at least {pct(C.SINGLE_DONOR_FRAC)} of its cells. ER, PR: oestrogen and progesterone receptor; HER2: the ERBB2 gene product.</p>
+<p><strong>Most picks are tumour-cell programmes that follow the intrinsic subtypes.</strong> In the risk direction, scGPT's pick is an ERBB2-containing luminal epithelial programme and Geneformer's a basal keratin programme. In the protective direction, HVG-PCA and scGPT both recover a luminal, oestrogen-responsive programme (GATA3, XBP1, AZGP1, TRPS1 in both lists). Their marker lists contain genes of the subtype axes that carry most prognostic information in breast cancer {cite("wirapati")}, and their bulk scores track PAM50 subtype (next section). Malignant cells cluster by patient in single-cell data {cite("tirosh")}: Geneformer's pre-specified pick ({share['gf']} of its cells from one donor) and HVG-PCA's sensitivity pick ({share['hs']}) are essentially one patient's tumour cells, and HVG-PCA's pre-specified pick ({share['hp']}) is the single-dataset state below.</p>
+<p><strong>The baseline's pre-specified pick is a single-dataset artefact.</strong> Its cells are annotated as exhausted T cells, yet its markers are testis and colon genes (CEACAM7, TKTL1, FAM9C, INSL3), and none of the canonical T-cell markers ({", ".join(T_CELL_GENES)}) is among its 50 genes; it does include {", ".join(BASE_EXTRA_GENES["treg"])}, a regulatory-T-cell transcription factor, and the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}. It was picked because its random-gene floor is low ({f3(b["floor_mean"])}), which makes its margin large although its C-index ({f3(b["cindex"])}) is not. The pre-specified P2 margins are measured against it.</p>
+<p><strong>Geneformer's protective pick is a mixed-lineage state.</strong> Its markers are nuclear-retained transcripts and immediate-early genes, the profile of low-quality or dissociation-stressed cells.</p>
+<p>{fr('fig_states')} places the picks in each representation's two-dimensional uniform manifold approximation and projection (UMAP) of all {n_(N_CELLS)} cells.</p>
+{fig("fig_states")}"""
+
+
+def subtype_html():
+    rows_ = []
+    for key in [(a, m) for a in ("primary", "sensitivity") for m in MODELS] + [("reference", "proliferation")]:
+        t, mb = SUB_REF if key[0] == "reference" else SUB[key]
+        a, m = key
+        lab = (f'{sw("prolif")}Proliferation score' if a == "reference" else f'{sw(m)}{NAME[m]}')
+        prog = "published reference" if a == "reference" else f'{"pre-specified" if a == "primary" else "sensitivity"} · {esc(programme(a, m))}'
+        av = AV_PROLIF["age+stage+PAM50"] if a == "reference" else AV_PICKS[(a, m, "age+stage+PAM50")]
+        rows_.append(f'<tr><td>{lab}</td><td>{prog}</td><td class="num">{f3(float(t["epsilon2"]), 2)}</td>'
+                     f'<td>{GROUP[t["tracked_group"]]}</td><td class="num">{f3(float(t["auc_tracked"]), 2)}</td>'
+                     f'<td class="num">{f3(float(mb["epsilon2"]), 2)}</td>'
+                     f'<td class="num">{f3(float(mb["auc_tracked_tcga_group"]), 2)}</td>'
+                     f'<td class="num">{f3(av["hr_per_sd"], 2)} ({pv(av["lrt_p_nominal"])})</td></tr>')
+    table = ('<div class="scroll"><table><thead><tr><th>signature</th><th>pick</th><th>ε², TCGA</th>'
+             '<th>subtype tracked most (TCGA)</th><th>AUC, TCGA</th><th>ε², METABRIC</th><th>AUC, METABRIC (same subtype)</th>'
+             '<th>HR/SD given age, stage, PAM50 (nominal p)</th></tr></thead><tbody>' + "".join(rows_) + '</tbody></table></div>')
+    t_n, m_n = int(SUB[("primary", "scgpt")][0]["n"]), int(SUB[("primary", "scgpt")][1]["n"])
+    au = {k: f3(float(SUB[k][0]["auc_tracked"]), 2) for k in TRACKERS}
+    aum = {k: f3(float(SUB[k][1]["auc_tracked_tcga_group"]), 2) for k in TRACKERS}
+    ep = {k: f3(float(SUB[k][0]["epsilon2"]), 2) for k in SUB}
+    lum = [AV_PICKS[("sensitivity", m, "age+stage+PAM50")]["hr_per_sd"] for m in ("hvg_pca", "scgpt")]
+    rk = FM_RISK_GIVEN_PAM
+    return f"""<h2 id="subtype">Do the states track PAM50 subtype? (post hoc)</h2>
+<p class="sub">Outcome-free: each pick's bulk score compared across intrinsic subtypes, in TCGA with the RNA-seq PAM50 call ({n_(t_n)} patients) and in METABRIC with its PAM50 and claudin-low call ({n_(m_n)} patients, no outcomes read).</p>
+{fig("fig_subtype")}
+<p>Four of the six picks track subtype. scGPT's risk pick is highest in HER2-enriched tumours (one-vs-rest AUC {au[('primary', 'scgpt')]}) and Geneformer's in basal-like tumours ({au[('primary', 'geneformer')]}); the luminal protective picks of HVG-PCA and scGPT are lowest in basal-like tumours (AUC {au[('sensitivity', 'hvg_pca')]} and {au[('sensitivity', 'scgpt')]}). METABRIC tracks the same subtypes in the same direction (AUC {aum[('primary', 'scgpt')]}, {aum[('primary', 'geneformer')]}, {aum[('sensitivity', 'hvg_pca')]} and {aum[('sensitivity', 'scgpt')]}). The baseline's single-dataset pick and Geneformer's stress state barely differ by subtype (ε² {ep[('primary', 'hvg_pca')]} and {ep[('sensitivity', 'geneformer')]} in TCGA); the proliferation score, for comparison, has ε² {f3(float(SUB_REF[0]['epsilon2']), 2)}. With PAM50 subtype, age and stage in the Cox model, the two foundation-model risk picks no longer point to risk (hazard ratio per standard deviation {f3(rk[0]['hr_per_sd'], 2)} and {f3(rk[1]['hr_per_sd'], 2)}, nominal p {pv(rk[0]['lrt_p_nominal'])} and {pv(rk[1]['lrt_p_nominal'])}), while the luminal protective picks keep hazard ratios below 1 ({f3(lum[0], 2)} and {f3(lum[1], 2)}); these hazard ratios are nominal, because every pick was selected on these outcomes.</p>
+<details class="every"><summary>Subtype association of the six picks and the proliferation reference</summary><div class="inner">
+{table}
+<p class="note">ε²: Kruskal–Wallis H / (n − 1), a rank-based effect size of subtype on the score. Subtype tracked most: the subtype whose one-vs-rest AUC is furthest from 0.5; below 0.5 means lower in that subtype. METABRIC AUC: for the subtype tracked in TCGA. HR/SD: Cox hazard ratio per standard deviation of the score with age, stage and PAM50 subtype as covariates, likelihood-ratio p.</p>
+</div></details>"""
+
+
+def donors_html():
+    d = DPR
+    rows_ = []
+    for m in MODELS:
+        r = d[m]
+        fisher = "" if m == "hvg_pca" else pv(r["fisher_p_single_donor_vs_baseline"])
+        rows_.append(f'<tr><td>{sw(m)}{NAME[m]}</td><td class="num">{r["n_states"]}</td>'
+                     f'<td class="num">{r["n_single_donor"]} ({pct(r["share_single_donor"])})</td>'
+                     f'<td class="num">{r["n_multi_donor"]}</td><td class="num">{pct(r["median_top_donor_frac"])}</td>'
+                     f'<td class="num">{r["median_n_donors"]:.0f}</td><td class="num">{fisher}</td>'
+                     f'<td class="num">{sgn(r["best_margin_multi_donor"])}</td><td class="num">{sgn(r["best_margin_or_multi_donor"])}</td>'
+                     f'<td class="num">{sgn(r["spearman_rho_margin_vs_top_donor"], 2)} ({pv(r["spearman_p"])})</td>'
+                     f'<td class="num">{sgn(r["spearman_rho_margin_or_vs_top_donor"], 2)} ({pv(r["spearman_p_or"])})</td></tr>')
+    table = ('<div class="scroll"><table><thead><tr><th>representation</th><th>kept states</th><th>single-donor</th>'
+             '<th>multi-donor</th><th>median share from largest donor</th><th>median donors per state</th>'
+             '<th>Fisher p vs HVG-PCA</th><th>best multi-donor margin, risk</th><th>best multi-donor margin, either</th>'
+             '<th>Spearman ρ, margin vs share, risk (p)</th><th>ρ, either (p)</th></tr></thead><tbody>'
+             + "".join(rows_) + '</tbody></table></div>')
+    rho = {m: sgn(d[m]["spearman_rho_margin_or_vs_top_donor"], 2) for m in MODELS}
+    return f"""<h2 id="donors">Donor mixing (post hoc)</h2>
+<p class="sub">Every kept state at the three resolutions, each entering once through its {C.DONOR_MIXING_TOPK}-gene signature. States nest across resolutions, so the counts and the Fisher p are descriptive.</p>
+{fig("fig_donor")}
+<p>Malignant cells cluster by patient in single-cell data {cite("tirosh")}, and the atlas was pooled without batch correction. {d['hvg_pca']['n_single_donor']} of {d['hvg_pca']['n_states']} HVG-PCA states ({pct(d['hvg_pca']['share_single_donor'])}) draw at least {pct(C.SINGLE_DONOR_FRAC)} of their cells from one donor, against {d['scgpt']['n_single_donor']} of {d['scgpt']['n_states']} scGPT ({pct(d['scgpt']['share_single_donor'])}) and {d['geneformer']['n_single_donor']} of {d['geneformer']['n_states']} Geneformer states ({pct(d['geneformer']['share_single_donor'])}); the median state draws {pct(d['hvg_pca']['median_top_donor_frac'])}, {pct(d['scgpt']['median_top_donor_frac'])} and {pct(d['geneformer']['median_top_donor_frac'])} of its cells from its largest donor. The foundation-model embeddings therefore produced fewer donor-specific states than HVG-PCA.</p>
+<p>This did not translate into clearly stronger prognostic signatures. Among multi-donor states (no donor above {pct(C.MULTI_DONOR_FRAC)}), the best margin above the floor in the risk direction is {f3(d['hvg_pca']['best_margin_multi_donor'])} for HVG-PCA, {f3(d['scgpt']['best_margin_multi_donor'])} for scGPT and {f3(d['geneformer']['best_margin_multi_donor'])} for Geneformer. Read in either direction it is {f3(d['hvg_pca']['best_margin_or_multi_donor'])}, {f3(d['scgpt']['best_margin_or_multi_donor'])} and {f3(d['geneformer']['best_margin_or_multi_donor'])}: the foundation models lead by {f3(DON_OR_AHEAD['scgpt'])} and {f3(DON_OR_AHEAD['geneformer'])}, single values selected on TCGA outcomes and without an interval. In the either-direction reading the margin rises with the share from the largest donor in all three representations (Spearman ρ {rho['hvg_pca']}, {rho['scgpt']} and {rho['geneformer']}): the states furthest from their floors tend to be dominated by one patient.</p>
+<details class="every"><summary>Donor mixing per representation, with margins and correlations</summary><div class="inner">
+{table}
+<p class="note">Single-donor: largest donor ≥ {pct(C.SINGLE_DONOR_FRAC)} of the state's cells; multi-donor: largest donor &lt; {pct(C.MULTI_DONOR_FRAC)}. Margin: C above the matched-random floor of the state's {C.DONOR_MIXING_TOPK}-gene signature, TCGA overall survival. Fisher p: single-donor share against HVG-PCA's.</p>
+</div></details>"""
+
+
+def stability_html():
+    arows = "".join(f'<tr><td>{sw(r["model"])}{NAME[r["model"]]}</td><td class="num">{float(r["resolution"]):.1f}</td>'
+                    f'<td class="num">{float(r["n_clusters_full_mean"]):.1f}</td><td class="num">{float(r["n_clusters_sub_mean"]):.1f}</td>'
+                    f'<td class="num">{f3(float(r["ari_mean"]), 2)} ± {f3(float(r["ari_sd"]), 2)}</td>'
+                    f'<td class="num">{f3(float(r["ari_min"]), 2)}</td></tr>' for r in STAB)
+    prow = []
+    for (a, m), r in STAB_PICKS.items():
+        prow.append(f'<tr><td>{sw(m)}{NAME[m]}</td><td>{"pre-specified" if a == "primary" else "sensitivity"} · {esc(programme(a, m))}</td>'
+                    f'<td class="num">{pct(float(r["top_donor_frac"]))}</td>'
+                    f'<td class="num">{f3(float(r["cell_jaccard_mean"]), 2)}</td><td class="num">{f3(float(r["marker_jaccard_mean"]), 2)}</td>'
+                    f'<td class="num">{pct(float(r["frac_cell_jaccard_ge_0.5"]))}</td>'
+                    f'<td class="num">{f3(float(r["cell_jaccard_mean_donor_kept"]), 2)} ({r["n_repeats_donor_kept"]})</td></tr>')
+    lo, hi = min(STAB_ARI), max(STAB_ARI)
+    jl, jh = STAB_J[STAB_LO], STAB_J[STAB_HI]
+    sd_picks = [(a, m) for (a, m) in STAB_PICKS if STAB_PICKS[(a, m)]["single_donor"] == "True"]
+    check(all(float(STAB_PICKS[k]["cell_jaccard_mean_donor_kept"]) > 0.85 for k in sd_picks),
+          "single-donor picks are reproduced when their donor is kept")
+    return f"""<h2 id="stability">Are the states stable? (post hoc)</h2>
+<p class="sub">{N_REP} subsamples, each keeping {pct(KEEP)} of the donors ({N_DON_KEPT} of {N_DONORS}, the same draw for all representations); the neighbour graph and Leiden clustering are rebuilt on the kept cells with the settings of the main analysis.</p>
+<p>The clusterings reproduce well: the mean adjusted Rand index between the subsample clustering and the full clustering restricted to the kept cells is {f3(lo, 2)}–{f3(hi, 2)} across representations and resolutions. The picks are less uniform. The best-matching subsample cluster shares on average {f3(jl, 2)} (scGPT's luminal ER pick) to {f3(jh, 2)} (the baseline's single-dataset pick) of a pick's cells (Jaccard index). The single-donor picks are reproduced almost exactly whenever their donor is kept, which is what one patient's cells clustering together predicts.</p>
+<details class="every"><summary>Stability per representation and resolution, and per pick</summary><div class="inner">
+<div class="scroll"><table><thead><tr><th>representation</th><th>resolution</th><th>clusters, full</th><th>clusters, subsample</th><th>adjusted Rand index, mean ± SD</th><th>minimum</th></tr></thead><tbody>{arows}</tbody></table></div>
+<div class="scroll"><table><thead><tr><th>representation</th><th>pick</th><th>largest donor</th><th>cell Jaccard, mean</th><th>marker Jaccard, mean</th><th>repeats with cell Jaccard ≥ 0.5</th><th>cell Jaccard when its largest donor is kept (repeats)</th></tr></thead><tbody>{"".join(prow)}</tbody></table></div>
+<p class="note">Cell Jaccard: overlap of the pick's kept cells with the best-matching subsample cluster (0 when all its cells were dropped). Marker Jaccard: overlap of that cluster's top markers with the pick's signature, recomputed as in the main analysis.</p>
+</div></details>"""
+
+
+def clinical_html():
+    nas, eas = AV_N["age+stage"]
+    nap, eap = AV_N["age+stage+PAM50"]
+    prol = AV_PROLIF["age+stage"]
+    prolp = AV_PROLIF["age+stage+PAM50"]
+    lum = [AV_PICKS[("sensitivity", m, b)] for m in ("hvg_pca", "scgpt") for b in ("age+stage", "age+stage+PAM50")]
+    check(all(r["hr_ci_hi"] < 1 for r in lum), "the luminal protective picks keep nominal HR < 1 with and without PAM50")
+    nfeat = STR["features"]
+    spread = max(max(AGE_STAGE_CVS) - min(AGE_STAGE_CVS), max(PAM_CLIN_CVS) - min(PAM_CLIN_CVS))
+    clin, pam = REF["clinical_full"], REF["pam50"]
+    pam_set, pam_base = SM["clinical_pam50"], SM["clinical_on_pam50_set"]
+    return f"""<h2 id="clinical">Clinical information</h2>
+<p class="sub">Each pick is added to a Cox proportional-hazards model of age and stage ({n_(nas)} patients, {eas} deaths) and to age, stage and PAM50 subtype ({n_(nap)} patients, {eap} deaths); {fr('fig_added_value')} shows the result. The ladder's C-indices are of the score alone; this section asks whether the score improves on what a clinician already has.</p>
+<p>Age and stage alone reach a cross-validated C-index of {f3(clin['cindex_cv_mean'])} ({n_(clin['n'])} patients); the PAM50 subtype call alone reaches {f3(pam['cindex_cv_mean'])} ({n_(pam['n'])} patients). In this cohort PAM50 subtype does not raise the cross-validated C of age and stage either ({f3(pam_set['cindex_mean'])} against {f3(pam_base['cindex_mean'])} on the {n_(pam_set['n'])} patients with a call), so the test has little room to show added value.</p>
+<p>The hazard ratios in {fr('fig_added_value')} are nominal: every pick was chosen on the outcomes of these patients. The change in cross-validated C-index repeats the selection, and the choice of direction, inside every training fold, so it carries no selection. On that measure every pick's change in C spans zero across the five repeats. The luminal protective picks of HVG-PCA and scGPT keep nominal hazard ratios below 1 with PAM50 in the model ({f3(lum[1]["hr_per_sd"], 2)} and {f3(lum[3]["hr_per_sd"], 2)} per standard deviation), but under nested selection they do not raise the cross-validated C-index. The published proliferation score (a fixed, published gene list, so free of selection) raises it by {sgn(prol["delta_cindex_cv_nested_mean"])} over age and stage; once PAM50 is in the model its change is {sgn(prolp["delta_cindex_cv_nested_mean"])}. Of the family maxima, only HVG-PCA's either-direction maximum raises it under nested selection ({sgn(FAMMAX_HVG_AS)}), and not once PAM50 is in the model.</p>
+<h3>All of a representation's states at once</h3>
+<p>A ridge-penalised Cox model with every state of a representation (50-gene signatures: {nfeat['hvg_pca']} HVG-PCA, {nfeat['scgpt']} scGPT, {nfeat['geneformer']} Geneformer) plus age and stage does not improve on age and stage alone ({fr('fig_stratify')}); differences of a few thousandths are within the spread across fold seeds. Gradient-boosted survival models (XGBoost, Cox objective, fixed hyperparameters) fall below age and stage alone with every representation's states ({f3(XGB_RANGE[0])}–{f3(XGB_RANGE[1])}), so they are not read as a comparison between representations.</p>
+<p class="note">Models within one section share their cross-validation folds; sections use different fold seeds, so the same model can differ by up to {f3(spread)} between sections (age + stage {f3(min(AGE_STAGE_CVS))}–{f3(max(AGE_STAGE_CVS))}; PAM50 + age + stage {f3(min(PAM_CLIN_CVS))} and {f3(max(PAM_CLIN_CVS))}).</p>
+{fig("fig_stratify")}"""
+
+
+def metabric_html():
+    os_, ds_ = MEND["OS"], MEND["DSS"]
+    check(all(k in M["criterion"] for k in ("floor p95", "age-adjusted, cohort-stratified HR", "TCGA direction", f"p < {C.ALPHA}")),
+          "the replication criterion stated on the page is the one in metabric.json")
+    BL = ' <span class="dim2">(borderline)</span>'
+
+    def ep_cells(sid, ep):
+        e = mrep(sid, ep)
+        return (f'<td class="num">{f3(e["cindex_oriented"])}</td><td class="num">{f3(e["floor_p95"])}</td>'
+                f'<td class="num">{f3(e["hr_per_sd"], 2)} ({pv(e["p"])})</td>'
+                f'<td>{yesno(e["replicates"])}{BL if floor_borderline(sid, ep) else ""}</td>')
+
+    sigrows = [(PID[a][m], f'{sw(m)}{NAME[m]}', f'{"pre-specified" if a == "primary" else "sensitivity"} · {esc(programme(a, m))}')
+               for a in ("primary", "sensitivity") for m in MODELS]
+    sigrows.append((PROLIF_ID, f'{sw("prolif")}Proliferation score', "published reference"))
+    os_rows, ds_rows = [], []
+    for sid, rep, lab in sigrows:
+        s_ = MSIG[sid]
+        cls = ' class="ref"' if sid == PROLIF_ID else ""
+        os_rows.append(f'<tr{cls}><td>{rep}</td><td>{lab}</td><td class="num">{pct(s_["coverage"])}</td>{ep_cells(sid, "OS")}</tr>')
+        sub = ""
+        if s_.get("p3"):
+            st, v = next(iter(s_["p3"].items()))
+            sub = f'{SUBTYPE.get(st, st)}: C {f3(v["OS"]["cindex_oriented"])}, p {pv(v["OS"]["perm_p"])}'
+        ds_rows.append(f'<tr{cls}><td>{rep}</td><td>{lab}</td>{ep_cells(sid, "DSS")}<td>{sub}</td></tr>')
+    head = '<th>C</th><th>floor p95</th><th>HR/SD (p)</th><th>replicates</th>'
+    table = (f'<details class="every"><summary>Numbers behind {fr("fig_replication")} for the six picks and the reference</summary><div class="inner">'
+             '<p class="tcap">Overall survival</p>'
+             '<div class="scroll"><table><thead><tr><th>representation</th><th>pick</th><th>genes measured</th>'
+             + head + '</tr></thead><tbody>' + "".join(os_rows) + '</tbody></table></div>'
+             '<p class="tcap">Disease-specific survival, and overall survival within the TCGA lead subtype</p>'
+             '<div class="scroll"><table><thead><tr><th>representation</th><th>pick</th>'
+             + head + '<th>within subtype, OS (no floor)</th></tr></thead><tbody>' + "".join(ds_rows) + '</tbody></table></div>'
+             '<p class="note">C is read in the direction fixed in TCGA. Floor p95: 95th percentile of '
+             f'{FROZ["n_floor_sets"]} matched random gene sets in METABRIC. HR/SD: age-adjusted hazard ratio per standard '
+             'deviation of the score in that direction, stratified by METABRIC cohort. Borderline: C within two approximate '
+             'Monte-Carlo standard errors of the floor p95 (normal approximation from the floor mean and p95). Within-subtype '
+             f'p: {n_(FROZ["n_perm_p3"])} outcome permutations; {pv(1 / (FROZ["n_perm_p3"] + 1))} is the smallest value '
+             'attainable.</p></div></details>')
+    gf = PID["primary"]["geneformer"]
+    lumA = SC_P3["LumA"]["OS"]
+    ds_p = mrep(PROLIF_ID, "DSS")
+    os_p = mrep(PROLIF_ID, "OS")
+    hi = sorted({sid for sid, _ in HIGH_HR_NO})
+    check(hi and all(sid.split(":")[0] in NAME for sid in hi), "high-HR signatures that fail the floor are named")
+    pick_ids = {PID[a][m] for a in PID for m in MODELS}
+    hi_txt = ", ".join(f"{NAME[sid.split(':')[0]]}'s {'protective' if sid.endswith('protective') else 'risk'} "
+                       f"{'pick' if sid in pick_ids else 'family maximum'} "
+                       f"({' and '.join(ep for s2, ep in HIGH_HR_NO if s2 == sid)})" for sid in hi)
+    base = PID["primary"]["hvg_pca"]
+    check(all(mrep(base, ep)["replicates"] for ep in ("OS", "DSS")), "the baseline's artefact pick replicates")
+    check([(a, m, ep) for a in PICKS for m in FMS for ep in ("OS", "DSS") if mrep(PID[a][m], ep)["replicates"]]
+          == [("primary", "geneformer", "DSS")], "the only foundation-model pick that replicates is Geneformer's risk pick on DSS")
+    check(floor_borderline(gf, "DSS"), "Geneformer's DSS replication is within Monte-Carlo error of its floor p95")
+    return f"""<h2 id="metabric">METABRIC in detail</h2>
+<p class="sub">The signatures, their directions and the replication criterion were fixed before METABRIC outcomes were examined.</p>
+<p>METABRIC {cite("curtis", "pereira")} is an expression-microarray cohort with long follow-up: {n_(os_['n'])} patients, {n_(os_['events'])} deaths (OS). Disease-specific survival (DSS) is the secondary endpoint; it censors deaths from other causes, leaving {n_(ds_['events'])} events. Twelve signatures were frozen with their genes and TCGA directions: the six picks, the family maxima and the proliferation reference. A signature replicates on an endpoint if its C, read in the TCGA direction, exceeds the 95th percentile of its METABRIC floor and its age-adjusted hazard ratio, stratified by METABRIC cohort, points in the TCGA direction with p &lt; {C.ALPHA}.</p>
+{fig("fig_replication")}
+{table}
+<p><strong>The replication shows no foundation-model advantage</strong> ({fr('fig_margin')}). The published proliferation score replicates most strongly (OS C = {f3(os_p['cindex_oriented'])} against a floor 95th percentile of {f3(os_p['floor_p95'])}; DSS C = {f3(ds_p['cindex_oriented'])}). Both HVG-PCA picks replicate. Of the foundation-model picks only Geneformer's risk pick meets the criterion, on DSS and by {sgn(gap(gf, 'DSS'), 4)}, within Monte-Carlo error of the floor p95. Within luminal A tumours scGPT's protective pick has C = {f3(lumA['cindex_oriented'])} with outcome-permutation p = {pv(lumA['perm_p'])}; no random-gene floor was computed within subtypes, so this is a result, not a pre-specified replication. Geneformer's protective pick does not replicate.</p>
+<p><strong>Random gene sets predict survival in METABRIC.</strong> With {n_(os_['events'])} deaths, the matched-random floors have 95th percentiles of {f3(FLOOR_RANGE[0], 2)}–{f3(FLOOR_RANGE[1], 2)}. Some signatures have hazard-ratio p-values below 10<sup>{MINUS}5</sup> and still do not beat random genes: {hi_txt}. This is the effect described by {REFS["venet"][0]}.</p>
+<p><strong>The baseline's artefact pick replicates on both endpoints.</strong> Why it replicates was not examined; its 50 genes include the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}.</p>"""
+
+
+# Deviations from the design: one row per entry of ladder.json "deviations" (id checked) and the post hoc additions.
+def corrections_html():
+    dev_ids = {d["id"] for d in L["deviations"]}
+    nb = P2C["primary"]["scgpt"]["n_boot"]
+    rows_ = [
+        ("reference_rung", "Clinical reference",
+         "The PAM50 subtype call and a published prognostic signature.",
+         "Age + stage, PAM50 subtype, and both together, each cross-validated on one set of patients; the published "
+         "11-gene proliferation score with its own random-gene floor and permutation p. A single in-sample model of "
+         "PAM50 + age + stage on fewer patients would not be comparable with the single-score C-indices."),
+        ("P1_statistic", "P1: what the family-wise null tests",
+         "A family-wise permutation null for the best signature's C-index.",
+         "The family maximum with its family-wise p, the statistic the null is built for; the margin-selected pick's p "
+         "against the same null is reported beside it."),
+        ("P1_permutations", "P1: number of permutations",
+         f"{N_PERM_DESIGN} outcome permutations.",
+         f"{n_(N_PERM)} permutations, for Monte-Carlo precision near 0.05; the {N_PERM_DESIGN}-permutation values are kept "
+         "and agree on every verdict."),
+        ("P2_margin", "P2: margin over the baseline",
+         "Test against baseline, both read as distance above the floor; the bootstrap interval must exclude zero.",
+         f"Above-floor margin with {n_(nb)} patient bootstraps that re-select each pick in every resample, so the "
+         "interval includes the selection over hundreds of signatures; passes if the lower 2.5% bound is above zero."),
+        ("P3_null", "P3: prognosis within subtype",
+         "At least one foundation-model state is prognostic within a PAM50 subtype.",
+         f"Best within-subtype C against {n_(P3_NPERM)} within-subtype outcome permutations, for every representation, "
+         "the baseline included, so that a pass can be compared with what the baseline reaches."),
+        ("monte_carlo_error", "Monte-Carlo error",
+         "Decisions at α = 0.05.",
+         "Every permutation p is given with its Monte-Carlo standard error, and a p within two standard errors of 0.05 is "
+         "marked borderline."),
+        ("P4_gate", "P4: genes outside the HVG set",
+         "Foundation-model signatures that pass P2 are enriched for non-HVG genes.",
+         "Tested only if P2 passes, with a hypergeometric test against the scored-gene universe; P2 fails, so P4 is not "
+         "applicable."),
+        ("per_setting_ladder", "Ladder at each setting",
+         "Resolution and marker count are swept, and the ladder is reported at each setting.",
+         "One pick per representation across all nine settings, paid for by a family-wise null over the same nine; the "
+         "ladder at each setting, with its own null, is in the table under the ladder in detail."),
+        ("covariate_adjustment", "Adjustment for age and stage",
+         "Cox models adjusted for age and stage in the primary model.",
+         "The ladder C-index is of the score alone; adjustment enters through the added-value analysis: hazard ratios "
+         "given age and stage, and the change in cross-validated C with the selection redone inside every fold."),
+        ("selection_conditional_intervals", "Bootstrap intervals in the ladder",
+         "Patient bootstrap intervals for the ladder.",
+         f"The whiskers in {fr('fig_ladder')} hold the pick fixed and are conditional on its selection; the selection-aware "
+         "interval is the one used for P2."),
+        ("reference_penalty", "Penalised reference models",
+         "PAM50 subtype as a reference rung.",
+         "The cross-validated C is the figure compared; the in-sample C of the penalised and unpenalised fits are given "
+         "because they differ for PAM50 alone."),
+        ("secondary_endpoint", "Secondary endpoint",
+         "Progression-free interval reported beside overall survival.",
+         "PFI analysed with the same statistics."),
+        ("posthoc", "Direction of effect",
+         "C-index read in the risk direction only.",
+         "Added post hoc: every signature also read in the direction it acts, labelled as a sensitivity analysis."),
+        ("clustering_stability", "Clustering stability",
+         "A separate diagnostic.",
+         f"Added post hoc: {N_REP} donor subsamplings ({pct(KEEP)} of donors), adjusted Rand index per clustering and "
+         "overlap per pick."),
+        ("posthoc", "Subtype association and donor mixing",
+         "Not in the design.",
+         "Added post hoc and outcome-free: each pick's score by PAM50 subtype in TCGA and METABRIC, and the donor "
+         "composition of every state against its margin."),
+        ("posthoc", "Multivariable models",
+         "Not in the design.",
+         "Added: ridge and gradient-boosted Cox models of all of a representation's states with age and stage, the "
+         "penalty applied to the state features only."),
+        ("posthoc", "METABRIC replication",
+         "Validation of any shortlisted state in an independent cohort.",
+         "All six picks, the family maxima and the proliferation reference, with signatures, directions and the "
+         "replication criterion fixed before METABRIC outcomes were examined."),
+    ]
+    for i, *_ in rows_:
+        check(i == "posthoc" or i in dev_ids, f"deviation {i} is recorded in ladder.json")
+    check(dev_ids <= {i for i, *_ in rows_}, f"every recorded deviation is on the page: {dev_ids - {i for i, *_ in rows_}}")
+    body = "".join(f'<tr><td><strong>{a}</strong></td><td>{b}</td><td>{c}</td></tr>' for _, a, b, c in rows_)
+    return f"""<h2 id="corrections">How the analysis was checked: deviations from the design</h2>
+<p class="sub">The code was audited against the design document. Where the reported analysis differs from the design, or goes beyond it, the table gives the design, what is reported and why; post hoc analyses are labelled as such wherever they appear.</p>
+<details class="every"><summary>Deviations from the design, and analyses added after it ({len(rows_)} items)</summary><div class="inner">
+<div class="scroll"><table class="wrap devs"><thead><tr><th>item</th><th>design</th><th>what is reported, and why</th></tr></thead><tbody>{body}</tbody></table></div>
+</div></details>"""
 
 
 def pipeline_html():
@@ -1090,42 +1494,35 @@ def pipeline_html():
     check(all("as coded" not in tidy(d) and "shortlist" not in tidy(d) and "validation template" not in tidy(d)
               for _, d in STAGES), "stage descriptions carry no process notes")
     check(dict(STAGES).get("report") and tidy(dict(STAGES)["report"]) == "figures", "the report stage reads 'figures'")
-    return f"""<h2 id="pipeline">How the analysis runs</h2>
+    t_stab = STABPAR["extra"]["seconds"]
+    return f"""<h2 id="pipeline">Reproduction</h2>
 <p class="sub">The pipeline is a Python package, <code>scfm</code>, whose stages are named commands. Each prints its plan with <code>--dry-run</code> before it touches data.</p>
+<details class="every"><summary>Stages, commands and reproduction tiers</summary><div class="inner">
 <div class="scroll"><table class="wrap"><thead><tr><th>stage</th><th>does</th></tr></thead><tbody>{stages}</tbody></table></div>
-<pre><code>uv run scfm list                          # stages, interpreter, root and log path
-uv run scfm run all --dry-run             # every stage's plan; dry runs are not logged
+<pre><code>uv run scfm list                          # the stages, in order
+uv run scfm run all --dry-run             # every stage's plan, nothing is run
 uv run scfm run translate -- --endpoint PFI
-make reproduce &amp;&amp; make verify             # tier A, then compare with results/MANIFEST.sha256</code></pre>
+make reproduce &amp;&amp; make verify             # tier A, then compare checksums of the outputs</code></pre>
 <div class="conv">
-<div><h3>Three reproduction tiers</h3><p><strong>A, from the distributed results</strong> ({about(T_TIER_A)}): rebuilds translate, ladder, stratify and report for OS and PFI from the distributed signatures. <strong>B, from the per-cell embeddings</strong> (not distributed): reruns <code>states</code> onward from the distributed cell list. <strong>C, from scratch</strong> ({about(T_TIER_C, 15)} on CPU, of which embedding is {hm(T_EMBED)}). Times are on a shared 4-core CPU machine. Tier A does not rebuild the atlas UMAP (figure 2), which needs per-cell tables that are not distributed.</p></div>
-<div><h3>Tests, continuous integration and data versions</h3><p>pytest covers the statistics, the stages' helpers and the Geneformer tokeniser, which is checked against the official tokeniser on a fixture; continuous integration runs the tests on every pull request. A smoke run executes every stage except <code>replicate</code>, both foundation models included, on 2,000 cells. Downloads are checksum-verified before use, and the atlas release and model versions are pinned.</p></div>
-</div>"""
+<div><h3>Three reproduction tiers</h3><p><strong>A, from the distributed results</strong> ({about(T_TIER_A)}): rebuilds translate, ladder, stratify and report for OS and PFI from the distributed signatures. <strong>B, from the per-cell embeddings</strong> (not distributed): reruns <code>states</code> onward from the distributed cell list; the donor-subsampling <code>stability</code> stage adds {about(t_stab)} on 6 cores. <strong>C, from scratch</strong> ({about(T_TIER_C, 15)} on CPU, of which embedding is {hm(T_EMBED)}). Times are on a shared CPU machine. Tier A does not rebuild the atlas UMAP ({fr('fig_states')}), which needs per-cell tables that are not distributed.</p></div>
+<div><h3>Tests and continuous integration</h3><p>pytest covers the statistics, the stages' helpers and the Geneformer tokeniser, which is checked against the official tokeniser on a fixture; continuous integration runs the tests on every pull request. A small run executes every stage except <code>replicate</code>, both foundation models included, on 2,000 cells. Downloads are checksum-verified before use, and the atlas release and model versions are pinned.</p></div>
+</div></div></details>"""
 
 
 def limits_html():
     sds = SINGLE_DONOR_STATES
-    cs = [d["now_reported"] for d in L["deviations"] if d["id"] == "clustering_stability"]
-    check(cs and cs[0].startswith("Not run") and len(C.LEIDEN_RESOLUTIONS) == 3 and len(C.MARKER_TOPK) == 3,
-          "clustering stability was not run; states at three resolutions and three marker counts")
     return f"""<h2 id="limits">Limits</h2>
 <ul class="limits">
-<li><strong>Neither model saw malignant cells in pretraining.</strong> The scGPT whole-human checkpoint was pretrained on non-diseased cells and Geneformer's corpus excluded malignant cells, while most of the picks here are malignant-cell states. Cancer-adapted checkpoints were not tested.</li>
-<li><strong>Light checkpoints.</strong> scGPT whole-human and the 6-layer Geneformer V1 model, run on CPU. A negative result is a result about these checkpoints.</li>
+<li><strong>Neither model saw malignant cells in pretraining.</strong> The scGPT whole-human checkpoint was pretrained on non-diseased cells and Geneformer's corpus excluded malignant cells, while most of the picks here are malignant-cell states. Cancer-adapted checkpoints, such as CancerFoundation {cite('theus')} or the cancer-tuned Geneformer, were not tested.</li>
+<li><strong>Light checkpoints, zero-shot.</strong> scGPT whole-human and the 6-layer Geneformer V1 model, without fine-tuning, run on CPU. A negative result is a result about these checkpoints.</li>
+<li><strong>A bulk score is a lossy projection.</strong> The mean z-score of a state's markers mixes the state's abundance with tumour purity, proliferation and subtype; information in the embedding that its marker genes do not carry is not tested.</li>
 <li><strong>One atlas, no batch correction.</strong> {N_DATASETS} datasets, 3′ and 5′ chemistries, pooled without integration; one baseline pick is confined to a single dataset.</li>
 <li><strong>Single-donor states.</strong> {WORD[len(SINGLE_DONOR_PICKS)].capitalize()} of the six picks, and {sds['hvg_pca'][0]}, {sds['scgpt'][0]} and {sds['geneformer'][0]} of the HVG-PCA, scGPT and Geneformer states, draw at least {pct(C.SINGLE_DONOR_FRAC)} of their cells from one donor.</li>
 <li><strong>Duplicate cells.</strong> {n_(DUPS['n_redundant_cells'])} cells ({100 * DUPS['n_redundant_cells'] / N_CELLS:.1f}%) duplicate other cells across Chen et al.'s Global Atlas and its compartment datasets; they were not removed.</li>
 <li><strong>Power.</strong> {N_EV} deaths among {n_(N_PAT)} TCGA patients, with short follow-up; the TCGA Pan-Cancer Clinical Data Resource flags breast-cancer OS as needing longer follow-up {cite('liuJ')}.</li>
 <li><strong>Selection in one cohort.</strong> The picks were chosen on TCGA outcomes. The family-wise null, the selection-aware bootstrap and the nested cross-validation pay for that choice within TCGA; METABRIC is the only out-of-sample test.</li>
-<li><strong>A bulk score is a proxy.</strong> The mean z-score of a state's markers mixes the state's abundance with tumour purity, proliferation and subtype.</li>
 <li><strong>One indication.</strong> Breast cancer was chosen for cohort size and established references; nothing here extends to other tumours until it is run there.</li>
-<li><strong>Cluster stability.</strong> The stability of the states under resampling was not assessed; they are reported at {WORD[len(C.LEIDEN_RESOLUTIONS)]} Leiden resolutions and {WORD[len(C.MARKER_TOPK)]} marker counts.</li>
 </ul>"""
-
-
-def related_html():
-    return f"""<h2 id="related">Related work</h2>
-<p>Carrying single-cell states into bulk cohorts to test prognosis is established: EcoTyper defined prognostic cell states and ecosystems across carcinomas {cite('luca')}; in breast cancer, {REFS['wuSZ'][0]} deconvolved bulk cohorts into ecotypes with distinct outcomes, and {REFS['chenA'][0]}, whose collection supplies {pct(CHEN_FRAC)} of this atlas's cells, found that the states whose associations held across cohorts were protective. Scissor {cite('sun')} uses the bulk phenotype to choose cells, so its associations are not independent tests of outcome; here state discovery never sees outcomes. Random gene sets predict breast-cancer outcome, mostly through proliferation {cite('venet', 'wirapati')}, which is the reason for the matched-random floor. Foundation models have been evaluated on cancer outcomes within single-cell cohorts {cite('roman')} and on TCGA survival from bulk embeddings {cite('liuW')}, and simple baselines match them on zero-shot cell-level tasks {cite('kedzierska')} and perturbation prediction {cite('ahlmann', 'bendidi')}. We found no prior study that combines foundation-model-defined states in a tumour atlas, a linear arm through the identical pipeline, matched-random and family-wise controls, and a replication with frozen signatures. The <a href="{REPO}/blob/main/research/literature.md">literature note in the repository</a> covers the field in more detail.</p>"""
 
 
 def refs_html():
@@ -1136,7 +1533,14 @@ def refs_html():
         lab = doi if doi.startswith("arXiv") else f"doi:{doi}"
         out.append(f'<li>{text} <a href="{url}">{lab.replace("/", "/<wbr>")}</a></li>')
     return f"""<h2 id="refs">References</h2>
+<p class="note">The <a href="{REPO}/blob/main/research/literature.md">literature note in the repository</a> covers the field in more detail.</p>
 <ol class="refs">{"".join(out)}</ol>"""
+
+
+SUMMARY = [question_html, benchmark_html, result_html, added_html, replication_html, cellstates_html, novelty_html,
+           scope_html, checked_html]
+TECHNICAL = [technical_html, methods_html, predictions_html, ladder_html, states_html, subtype_html, donors_html,
+             stability_html, clinical_html, metabric_html, corrections_html, pipeline_html, limits_html, refs_html]
 
 
 # ----------------------------------------------------------------------------- page
@@ -1150,20 +1554,24 @@ FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hid
 
 NAV_JS = """
 (()=>{
-  const nav=document.querySelector('.topnav'), btn=nav.querySelector('.navtoggle');
+  const nav=document.querySelector('.topnav'), btn=nav.querySelector('.navtoggle'), tb=nav.querySelector('.techbtn');
   const links=[...nav.querySelectorAll('ul a')];
   const byId=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
   const setOpen=o=>{nav.classList.toggle('open',o);btn.setAttribute('aria-expanded',String(o));};
+  const setTech=o=>{nav.classList.toggle('techopen',o);tb.setAttribute('aria-expanded',String(o));};
   btn.addEventListener('click',()=>setOpen(!nav.classList.contains('open')));
-  links.forEach(a=>a.addEventListener('click',()=>setOpen(false)));
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
-  document.addEventListener('click',e=>{if(!nav.contains(e.target))setOpen(false);});
+  tb.addEventListener('click',()=>setTech(!nav.classList.contains('techopen')));
+  links.forEach(a=>a.addEventListener('click',()=>{setOpen(false);setTech(false);}));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){setOpen(false);setTech(false);}});
+  document.addEventListener('click',e=>{if(!nav.contains(e.target)){setOpen(false);setTech(false);}});
   const heads=[...byId.keys()].map(id=>document.getElementById(id)).filter(Boolean);
   const mark=()=>{
     const y=nav.offsetHeight+24; let cur=null;
     for(const h of heads){ if(h.getBoundingClientRect().top<=y) cur=h; else break; }
     links.forEach(a=>{a.classList.remove('active');a.removeAttribute('aria-current');});
+    tb.classList.remove('active');
     if(cur){const a=byId.get(cur.id);a.classList.add('active');a.setAttribute('aria-current','true');
+      if(a.closest('.sub')) tb.classList.add('active');
       btn.textContent=a.textContent;} else btn.textContent='Sections';
   };
   addEventListener('scroll',mark,{passive:true}); addEventListener('resize',mark); mark();
@@ -1204,8 +1612,24 @@ a{{color:var(--ink)}}
   color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px 10px;cursor:pointer;
   max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .navtoggle::before{{content:"\\2261\\00a0\\00a0";font-size:13px}}
-.navtoggle:focus-visible{{outline:2px solid var(--scgpt);outline-offset:2px}}
+.navtoggle:focus-visible,.techbtn:focus-visible{{outline:2px solid var(--scgpt);outline-offset:2px}}
+.topnav li.grp{{display:none}}
+.topnav li.tech{{position:relative}}
+.techbtn{{font:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);
+  background:none;border:0;border-bottom:2px solid transparent;padding:17px 0 15px;cursor:pointer;white-space:nowrap}}
+.techbtn::after{{content:" \\25BE"}}
+.techbtn:hover,.techbtn.active{{color:var(--ink)}}
+.techbtn.active{{border-bottom-color:var(--ink)}}
+.topnav ul.sub{{display:none;position:absolute;top:54px;right:0;flex-direction:column;gap:0;min-width:240px;
+  max-height:calc(100vh - 70px);overflow-y:auto;background:var(--panel);border:1px solid var(--rule);border-radius:3px;
+  box-shadow:0 8px 24px rgba(22,25,29,.12);padding:6px 0}}
+.topnav.techopen ul.sub{{display:flex}}
+.topnav ul.sub a{{padding:8px 16px;border-bottom:0;border-left:2px solid transparent;font-size:10.5px}}
+.topnav ul.sub a.active{{border-left-color:var(--ink);background:var(--band)}}
 @media (max-width:1200px){{
+  .topnav li.grp{{display:block;padding:8px 16px 4px;font-size:9.5px;letter-spacing:.1em;color:var(--muted);font-weight:600}}
+  .techbtn{{display:none}}
+  .topnav ul.sub{{display:flex;position:static;border:0;box-shadow:none;padding:0;max-height:none;overflow:visible;min-width:0}}
   .navtoggle{{display:block}}
   .topnav ul{{display:none;position:absolute;top:54px;right:0;flex-direction:column;gap:0;min-width:230px;
     max-height:calc(100vh - 70px);overflow-y:auto;
@@ -1220,7 +1644,28 @@ header{{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:34p
 .nw{{white-space:nowrap}}
 h1{{font-size:clamp(25px,3.4vw,36px);line-height:1.15;letter-spacing:-.02em;margin:0 0 12px;text-wrap:balance;font-weight:640}}
 .byline{{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:0 0 18px}}
-.abstract{{font-size:16.5px;line-height:1.62;margin:0;max-width:980px}}
+.scope{{font-size:15.5px;color:var(--muted);margin:0 0 14px;text-wrap:balance}}
+.abstract{{font-size:15px;line-height:1.6;margin:0 0 18px}}
+.repo{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;text-decoration:none;color:inherit;
+  background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--ink);
+  border-radius:0 3px 3px 0;padding:14px 18px}}
+.repo:hover{{border-color:var(--ink)}}
+.repo svg{{color:var(--ink);flex:none}}
+.repo span{{font-size:14px;color:var(--muted);line-height:1.45;flex:1 1 24ch}}
+.repo b{{color:var(--ink)}}
+.repo .repo-path{{flex:0 0 auto;font-family:var(--mono);font-size:11.5px;color:var(--ink);
+  border:1px solid var(--rule);border-radius:2px;padding:4px 9px;white-space:nowrap}}
+.repo:hover .repo-path{{border-color:var(--ink)}}
+@media (max-width:640px){{.repo .repo-path{{flex-basis:100%;text-align:center;white-space:normal;overflow-wrap:anywhere}}}}
+ul.ctl,ul.known{{padding-left:20px;margin:0 0 14px}}
+ul.ctl li,ul.known li{{margin:0 0 8px}}
+h2.divider{{font-size:26px;margin:96px 0 8px;padding-top:26px;border-top:2px solid var(--ink)}}
+table.brief td{{white-space:normal}}
+table.brief td:nth-child(1){{min-width:130px}}
+table.brief td:nth-child(2){{min-width:170px}}
+table.brief td:nth-child(3){{min-width:180px}}
+table.devs td:first-child{{white-space:normal;min-width:160px}}
+table.devs td{{min-width:220px}}
 h2{{font-size:21px;letter-spacing:-.01em;margin:60px 0 8px;font-weight:640;text-wrap:balance}}
 h3{{font-size:14.5px;font-weight:640;margin:26px 0 8px}}
 .sub{{color:var(--muted);font-size:15px;margin:0 0 18px}}
@@ -1332,20 +1777,54 @@ footer a{{color:var(--ink)}}
 @media (prefers-reduced-motion:reduce){{*{{scroll-behavior:auto!important}}}}
 """
 
-NAV = [("result", "Result"), ("states", "States"), ("clinical", "Clinical"), ("replication", "Replication"),
-       ("approach", "Approach"), ("controls", "Controls"), ("predictions", "Predictions"),
-       ("sensitivity", "Sensitivity"), ("pfi", "PFI"), ("pipeline", "Pipeline"),
-       ("limits", "Limits"), ("related", "Related"), ("refs", "Refs")]
+NAV_SUMMARY = [("question", "Question"), ("benchmark", "Benchmark"), ("result", "Result"), ("added", "Added value"),
+               ("replication", "Replication"), ("cellstates", "States"), ("novelty", "Novelty"), ("scope", "Scope"),
+               ("checked", "Checks")]
+NAV_TECH = [("technical", "Technical detail"), ("methods", "Methods"), ("predictions", "Predictions"),
+            ("ladder", "Ladder in detail"), ("states", "Picked states"), ("subtype", "PAM50 subtype"),
+            ("donors", "Donor mixing"), ("stability", "Stability"), ("clinical", "Clinical"), ("metabric", "METABRIC"),
+            ("corrections", "Deviations"), ("pipeline", "Reproduction"), ("limits", "Limits"), ("refs", "References")]
+
+
+def visible_text(h):
+    t = re.sub(r"<(script|style|svg)\b.*?</\1>", " ", h, flags=re.S)
+    t = re.sub(r'<img[^>]*>', " ", t)
+    t = re.sub(r"<[^>]+>", " ", t)
+    return html.unescape(re.sub(r"\s+", " ", t))
+
+
+def prose_words(h):
+    """Words of running prose: paragraphs and list items, without figures, tables and notes."""
+    h = re.sub(r"<(figure|table|details|svg)\b.*?</\1>", " ", h, flags=re.S)
+    h = re.sub(r'<p class="note">.*?</p>', " ", h, flags=re.S)
+    parts = re.findall(r"<(?:p|li)\b[^>]*>(.*?)</(?:p|li)>", h, flags=re.S)
+    return sum(len(visible_text(x).split()) for x in parts)
 
 
 def build():
     today = date.today()
-    body = "\n".join([header_html(today), result_html(), states_html(), clinical_html(), replication_html(),
-                      approach_html(), controls_html(), predictions_html(), sensitivity_html(), pfi_html(),
-                      pipeline_html(), limits_html(), related_html(), refs_html()])
+    summary = "\n".join([header_html(today)] + [f() for f in SUMMARY])
+    technical = "\n".join(f() for f in TECHNICAL)
+    body = summary + "\n" + technical
     ids = re.findall(r'<h2 id="([^"]+)"', body)
-    check(ids == [a for a, _ in NAV], f"navbar sections match the page sections: {ids}")
-    nav = "".join(f'<li><a href="#{a}">{t}</a></li>' for a, t in NAV)
+    check(ids == [a for a, _ in NAV_SUMMARY + NAV_TECH], f"navbar sections match the page sections: {ids}")
+    figs = re.findall(r'<figure class="result" id="([^"]+)"', body)
+    check(figs == sorted(FIGNO, key=FIGNO.get), f"figures appear in their numbered order: {figs}")
+    vis = visible_text(body)
+    bad = [w for w in ("rather than", "instead of", "by contrast", "not assumed", "adds nothing", "commit", "registry",
+                       "first run", ".json", "run log", "sha256", "revision", "built by", "as coded")
+           if w in vis.lower()]
+    check(not bad, f"forbidden phrases on the page: {bad}")
+    check(not re.search(r"\badds? to\b", vis) or "no reproducible" in vis, "'adds to' only with 'no reproducible'")
+    n_sum = prose_words(summary.split("</header>", 1)[1])
+    n_abs = len(visible_text(re.search(r'<p class="abstract">(.*?)</p>', summary, re.S).group(1)).split())
+    check(110 <= n_abs <= 150, f"abstract is 110-150 words ({n_abs})")
+    nav = ('<li class="grp">Summary</li>' + "".join(f'<li><a href="#{a}">{t}</a></li>' for a, t in NAV_SUMMARY)
+           + '<li class="tech"><button class="techbtn" type="button" aria-expanded="false" aria-controls="techlist">'
+           'Technical detail</button><ul class="sub" id="techlist">'
+           + '<li class="grp">Technical detail</li>'
+           + "".join(f'<li><a href="#{a}">{"Overview" if a == "technical" else t}</a></li>' for a, t in NAV_TECH)
+           + '</ul></li>')
     html_ = f"""<title>Cell states and survival</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(FAVICON)}">
@@ -1368,7 +1847,8 @@ def build():
                    '<meta name="description" content="Cell states from scGPT, Geneformer and an HVG-PCA baseline, turned into '
                    'signatures and tested for breast-cancer survival in TCGA-BRCA and METABRIC.">\n'
                    + html_ + "\n</html>\n")
-    print(f"wrote {OUT}  {OUT.stat().st_size / 1024:.0f} KB")
+    print(f"wrote {OUT}  {OUT.stat().st_size / 1024:.0f} KB; abstract {n_abs} words; summary prose {n_sum} words "
+          f"(after the header, figures, tables and notes excluded)")
 
 
 if __name__ == "__main__":
