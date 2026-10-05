@@ -1,7 +1,7 @@
 {
   "script": "ladder.py",
-  "timestamp_utc": "2026-10-02T10:48:36+00:00",
-  "command": "src/scfm/stages/ladder.py",
+  "timestamp_utc": "2026-10-05T13:05:27+00:00",
+  "command": "src/scfm/stages/ladder.py --metabric-dir /scratch/metabric_probe",
   "args": {
     "data_dir": "data",
     "states_dir": "results/states",
@@ -10,9 +10,11 @@
     "out_dir": "results/ladder",
     "n_boot": 200,
     "seed": 42,
+    "n_fw_perm": 10000,
+    "metabric_dir": "/scratch/metabric_probe",
     "dry_run": false
   },
-  "git_commit": "472a7c503affc02889ad3e756a1b164ebc7ebf46",
+  "git_commit": "59a0d13a29d893ca0575b913141a6b1600b081e4",
   "git_dirty": true,
   "versions": {
     "python": "3.12.3",

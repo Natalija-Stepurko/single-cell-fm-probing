@@ -24,11 +24,17 @@ Corrected statistics (beside the pre-registered ones above)
   primary     hvg_pca     family max 0.569 (0.3/c25_k100) fw p=0.178 (MC se 0.017); pick p=0.178; P1_corrected=False
   primary     scgpt       family max 0.564 (1.0/c18_k100) fw p=0.218 (MC se 0.018); pick p=0.218; P1_corrected=False
   primary     geneformer  family max 0.567 (0.5/c5_k100) fw p=0.156 (MC se 0.016); pick p=0.186; P1_corrected=False
+  primary     hvg_pca     10,000 perms: fw p=0.1941 (MC se 0.0040); pick p=0.1941; null mean 0.554 p95 0.584; P1_corrected=False
+  primary     scgpt       10,000 perms: fw p=0.2059 (MC se 0.0040); pick p=0.2059; null mean 0.550 p95 0.581; P1_corrected=False
+  primary     geneformer  10,000 perms: fw p=0.1662 (MC se 0.0037); pick p=0.1900; null mean 0.549 p95 0.580; P1_corrected=False
   primary     scgpt       P2 above-floor margin -0.007 [-0.043,+0.006] (selection-aware, B=1000) P2_corrected=False
   primary     geneformer  P2 above-floor margin -0.005 [-0.043,+0.001] (selection-aware, B=1000) P2_corrected=False
   sensitivity hvg_pca     family max 0.597 (0.5/c27_k50) fw p=0.028 (MC se 0.007); pick p=0.333; P1_corrected=True
   sensitivity scgpt       family max 0.605 (1.0/c32_k25) fw p=0.010 (MC se 0.004); pick p=0.010; P1_corrected=True
   sensitivity geneformer  family max 0.588 (1.0/c14_k25) fw p=0.040 (MC se 0.009, borderline); pick p=0.347; P1_corrected=True
+  sensitivity hvg_pca     10,000 perms: fw p=0.0251 (MC se 0.0016); pick p=0.3514; null mean 0.565 p95 0.591; P1_corrected=True
+  sensitivity scgpt       10,000 perms: fw p=0.0054 (MC se 0.0007); pick p=0.0054; null mean 0.560 p95 0.587; P1_corrected=True
+  sensitivity geneformer  10,000 perms: fw p=0.0490 (MC se 0.0022, borderline); pick p=0.3446; null mean 0.560 p95 0.588; P1_corrected=True
   sensitivity scgpt       P2 above-floor margin +0.001 [-0.033,+0.022] (selection-aware, B=1000) P2_corrected=False
   sensitivity geneformer  P2 above-floor margin -0.005 [-0.036,+0.019] (selection-aware, B=1000) P2_corrected=False
   P3 primary/hvg_pca         max within-subtype C 0.626 (LumB) p=0.1299 (MC se 0.0034)
@@ -52,3 +58,26 @@ Added value over age + stage (selected rows: nominal LRT p; nested CV redoes the
   family_max_sensitivity  scgpt         c32_k25             HR/SD 0.78  LRT p 0.00234  dC fixed +0.0336  nested +0.0252
   family_max_sensitivity  geneformer    c14_k25             HR/SD 0.93  LRT p 0.401  dC fixed +0.0000  nested -0.0025
   reference               proliferation PAM50 proliferation HR/SD 1.28  LRT p 0.00466  dC fixed +0.0144  nested +0.0144
+
+Subtype association of the picks (outcome-free; Kruskal-Wallis, one-vs-rest AUC)
+  TCGA     hvg_pca       0.3/c25_k100            primary;sensitivity;family_max_primary   H=289.7 p=1.8e-61 eta2_H=0.34  Basal AUC=0.89
+  TCGA     geneformer    1.0/c8_k100             primary;sensitivity                      H=287.7 p=4.9e-61 eta2_H=0.34  Basal AUC=0.89
+  TCGA     scgpt         1.0/c18_k100            primary;family_max_primary               H=290.7 p=1.1e-61 eta2_H=0.34  Basal AUC=0.90
+  TCGA     scgpt         1.0/c32_k25             sensitivity;family_max_sensitivity       H=389.4 p=5.4e-83 eta2_H=0.46  Basal AUC=0.03
+  TCGA     geneformer    0.5/c5_k100             family_max_primary                       H=295.1 p=1.2e-62 eta2_H=0.35  Basal AUC=0.90
+  TCGA     hvg_pca       0.5/c27_k50             family_max_sensitivity                   H=454.4 p=4.9e-97 eta2_H=0.54  Basal AUC=0.01
+  TCGA     geneformer    1.0/c14_k25             family_max_sensitivity                   H=30.8 p=3.3e-06 eta2_H=0.03  Her2 AUC=0.36
+  TCGA     proliferation PAM50 proliferation     reference                                H=516.2 p=2.1e-110 eta2_H=0.61  LumA AUC=0.08
+  METABRIC hvg_pca       0.3/c25_k100            primary;sensitivity;family_max_primary   H=462.6 p=9.2e-98 eta2_H=0.23  Basal AUC=0.90
+  METABRIC geneformer    1.0/c8_k100             primary;sensitivity                      H=440.0 p=7.1e-93 eta2_H=0.22  Basal AUC=0.90
+  METABRIC scgpt         1.0/c18_k100            primary;family_max_primary               H=460.3 p=2.9e-97 eta2_H=0.23  Basal AUC=0.90
+  METABRIC scgpt         1.0/c32_k25             sensitivity;family_max_sensitivity       H=876.2 p=3.8e-187 eta2_H=0.44  Basal AUC=0.13
+  METABRIC geneformer    0.5/c5_k100             family_max_primary                       H=457.2 p=1.4e-96 eta2_H=0.23  Basal AUC=0.90
+  METABRIC hvg_pca       0.5/c27_k50             family_max_sensitivity                   H=1058.9 p=1.1e-226 eta2_H=0.54  Basal AUC=0.10
+  METABRIC geneformer    1.0/c14_k25             family_max_sensitivity                   H=140.5 p=1.4e-28 eta2_H=0.07  Normal AUC=0.65
+  METABRIC proliferation PAM50 proliferation     reference                                H=1026.5 p=1.1e-219 eta2_H=0.52  Basal AUC=0.89
+
+Donor mixing of the states (single donor: top-donor share >= 0.8; margins of the k = 50 signature)
+  hvg_pca     50/123 single-donor (41%), median top-donor 0.40, entropy 2.16; rho(margin, top donor) +0.04 (p 0.64), oriented +0.43 (p 7.8e-07); best multi-donor margin +0.082 / oriented +0.082
+  scgpt       6/67 single-donor (9%), median top-donor 0.18, entropy 4.43; rho(margin, top donor) -0.23 (p 0.065), oriented +0.22 (p 0.076); best multi-donor margin +0.068 / oriented +0.073
+  geneformer  10/71 single-donor (14%), median top-donor 0.15, entropy 4.49; rho(margin, top donor) -0.16 (p 0.18), oriented +0.20 (p 0.1); best multi-donor margin +0.055 / oriented +0.064

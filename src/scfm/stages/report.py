@@ -638,10 +638,9 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                      "references",
             "question": "Does any representation's best cell state predict overall survival beyond chance "
                         "selection, and how far is it from routine clinical information?",
-            "shows": "Two panels sharing the C axis. Top: pre-specified analysis (risk direction), committed "
-                     "in the repository before any data were downloaded (commit 8d2c2d0; no external "
-                     "registry). Bottom: post hoc sensitivity analysis (either direction, C read in the "
-                     "direction the score acts). One row per representation.",
+            "shows": "Two panels sharing the C axis. Top: pre-specified analysis (risk direction). Bottom: "
+                     "post hoc sensitivity analysis (either direction, C read in the direction the score "
+                     "acts). One row per representation.",
             "how_to_read": [
                 "Bar: Harrell's C of the pick's score alone, unadjusted. Its whisker holds the pick fixed, "
                 "so it is optimistic.",
@@ -709,8 +708,7 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                      "the subtitle. Overall survival by tertile of the signature score (tertiles cut within "
                      "each panel), all patients and within the PAM50 subtype where its within-subtype C was "
                      "highest; numbers at risk below; curves stop at 8 years.",
-            "how_to_read": ["The statistics in the panel notes are read from ladder.json and metabric.json.",
-                            "Choice rule: a ladder pick that replicates on METABRIC OS, preferring one that "
+            "how_to_read": ["Choice rule: a ladder pick that replicates on METABRIC OS, preferring one that "
                             "passed P3 in TCGA, then the larger METABRIC OS margin over its floor."],
             "data_files": [f["ladder"], f["metabric"], f["frozen"], f["clinical"], f["expression"]]},
         "fig_margin": {

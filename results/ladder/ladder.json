@@ -464,6 +464,184 @@
       }
     }
   },
+  "family_wise_10k": {
+    "n_perm": 10000,
+    "seed": 57,
+    "permutations": "one set of outcome permutations shared by every representation",
+    "statistic": "vectorised Harrell's C (scfm.stats.permuted_cindex), equal to lifelines",
+    "check": {
+      "n_checked": 36,
+      "max_abs_diff_vs_lifelines": 0.0
+    },
+    "role": "the reported family-wise p for P1; family_wise keeps the pre-registered 500-permutation values",
+    "primary": {
+      "hvg_pca": {
+        "stat": 0.5713780157557853,
+        "argmax": [
+          "1.0/c50_k50"
+        ],
+        "argmax_top_cell_type": [
+          "malignant cell"
+        ],
+        "argmax_above_floor": [
+          0.0838344719350073
+        ],
+        "fw_p": 0.1987801219878012,
+        "fw_p_mc_se": 0.003990821783672081,
+        "fw_p_borderline": false,
+        "pick_stat": 0.5474366075824717,
+        "pick_fw_p": 0.6699330066993301,
+        "pick_fw_p_mc_se": 0.004702369330817449,
+        "n_perm": 10000,
+        "P1_floor_condition": "every maximising signature above its floor",
+        "P1_corrected": false,
+        "null_mean": 0.556285428975874,
+        "null_p95": 0.5880885339734121,
+        "fw_p_500": 0.1596806387225549,
+        "pick_fw_p_500": 0.7025948103792415,
+        "P1_corrected_500": false
+      },
+      "scgpt": {
+        "stat": 0.576101674052191,
+        "argmax": [
+          "1.0/c11_k50"
+        ],
+        "argmax_top_cell_type": [
+          "malignant cell"
+        ],
+        "argmax_above_floor": [
+          0.0741361244460856
+        ],
+        "fw_p": 0.0984901509849015,
+        "fw_p_mc_se": 0.0029797624258298314,
+        "fw_p_borderline": false,
+        "pick_stat": 0.576101674052191,
+        "pick_fw_p": 0.0984901509849015,
+        "pick_fw_p_mc_se": 0.0029797624258298314,
+        "n_perm": 10000,
+        "P1_floor_condition": "every maximising signature above its floor",
+        "P1_corrected": false,
+        "null_mean": 0.5517227304899065,
+        "null_p95": 0.583797236582964,
+        "fw_p_500": 0.12574850299401197,
+        "pick_fw_p_500": 0.12574850299401197,
+        "P1_corrected_500": false
+      },
+      "geneformer": {
+        "stat": 0.5568223781388478,
+        "argmax": [
+          "0.5/c13_k25"
+        ],
+        "argmax_top_cell_type": [
+          "malignant cell"
+        ],
+        "argmax_above_floor": [
+          0.0454627492614475
+        ],
+        "fw_p": 0.36966303369663034,
+        "fw_p_mc_se": 0.004827134504183971,
+        "fw_p_borderline": false,
+        "pick_stat": 0.5464826440177253,
+        "pick_fw_p": 0.5858414158584142,
+        "pick_fw_p_mc_se": 0.004925761375903453,
+        "n_perm": 10000,
+        "P1_floor_condition": "every maximising signature above its floor",
+        "P1_corrected": false,
+        "null_mean": 0.5513104197439684,
+        "null_p95": 0.5839949532250123,
+        "fw_p_500": 0.36726546906187624,
+        "pick_fw_p_500": 0.5868263473053892,
+        "P1_corrected_500": false
+      }
+    },
+    "sensitivity": {
+      "hvg_pca": {
+        "stat": 0.6004431314623337,
+        "argmax": [
+          "0.3/c14_k50",
+          "0.5/c21_k50",
+          "1.0/c23_k50"
+        ],
+        "argmax_top_cell_type": [
+          "malignant cell",
+          "malignant cell",
+          "malignant cell"
+        ],
+        "argmax_above_floor": [
+          0.0914532557853272,
+          0.096101827917282,
+          0.0909154972919742
+        ],
+        "fw_p": 0.0254974502549745,
+        "fw_p_mc_se": 0.0015763035965660169,
+        "fw_p_borderline": false,
+        "pick_stat": 0.5912419990152634,
+        "pick_fw_p": 0.07219278072192781,
+        "pick_fw_p_mc_se": 0.0025880684522161207,
+        "n_perm": 10000,
+        "P1_floor_condition": "every maximising signature above its floor",
+        "P1_corrected": true,
+        "null_mean": 0.5674862352289513,
+        "null_p95": 0.5949809207287051,
+        "fw_p_500": 0.023952095808383235,
+        "pick_fw_p_500": 0.0658682634730539,
+        "P1_corrected_500": true
+      },
+      "scgpt": {
+        "stat": 0.5929191285081241,
+        "argmax": [
+          "1.0/c5_k50"
+        ],
+        "argmax_top_cell_type": [
+          "malignant cell"
+        ],
+        "argmax_above_floor": [
+          0.0808431037666175
+        ],
+        "fw_p": 0.0413958604139586,
+        "fw_p_mc_se": 0.00199204023941653,
+        "fw_p_borderline": false,
+        "pick_stat": 0.5829486706056131,
+        "pick_fw_p": 0.10618938106189381,
+        "pick_fw_p_mc_se": 0.003080798539528116,
+        "n_perm": 10000,
+        "P1_floor_condition": "every maximising signature above its floor",
+        "P1_corrected": true,
+        "null_mean": 0.5625983105612998,
+        "null_p95": 0.5912889278680453,
+        "fw_p_500": 0.033932135728542916,
+        "pick_fw_p_500": 0.09780439121756487,
+        "P1_corrected_500": true
+      },
+      "geneformer": {
+        "stat": 0.5904572870507139,
+        "argmax": [
+          "1.0/c14_k100"
+        ],
+        "argmax_top_cell_type": [
+          "malignant cell"
+        ],
+        "argmax_above_floor": [
+          0.0812817731413095
+        ],
+        "fw_p": 0.054594540545945404,
+        "fw_p_mc_se": 0.002271870962192231,
+        "fw_p_borderline": false,
+        "pick_stat": 0.5782711718365336,
+        "pick_fw_p": 0.16098390160983903,
+        "pick_fw_p_mc_se": 0.003675161017320366,
+        "n_perm": 10000,
+        "P1_floor_condition": "every maximising signature above its floor",
+        "P1_corrected": false,
+        "null_mean": 0.5631314669497784,
+        "null_p95": 0.5914889524864598,
+        "fw_p_500": 0.05189620758483034,
+        "pick_fw_p_500": 0.17165668662674652,
+        "P1_corrected_500": false
+      }
+    },
+    "verdicts_changed": []
+  },
   "p2_corrected": {
     "primary": {
       "scgpt": {
@@ -836,6 +1014,12 @@
       "design": "PFI is the secondary endpoint; both reported.",
       "as_coded": "Only OS was analysed.",
       "now_reported": "PFI run through translate and ladder into results/translate_pfi and results/ladder_pfi with the same statistics."
+    },
+    {
+      "id": "P1_permutations",
+      "design": "Family-wise permutation null with 500 outcome permutations.",
+      "as_coded": "500 permutations (family_wise, translate's stream); kept unchanged.",
+      "now_reported": "design: 500 permutations; reported: 10,000 for Monte-Carlo precision; the 500-permutation values are kept and no verdict depends on the change (family_wise_10k, its own stream, seed 57)."
     }
   ]
 }

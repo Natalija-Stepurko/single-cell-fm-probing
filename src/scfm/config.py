@@ -140,6 +140,15 @@ SEED_REPLICATE_FLOOR = SEED + 11
 SEED_REPLICATE_PERM = SEED + 12
 SEED_REPLICATE_BOOT = SEED + 13
 SEED_REPLICATE_SHUFFLE = SEED + 14   # --shuffle-outcomes only (a test of the stage, not an analysis)
+# family-wise null at 10,000 permutations (Monte-Carlo precision; the pre-registered 500 are kept)
+N_FW_PERM = 20 if SMOKE else 10_000
+SEED_FW_PERM = SEED + 15
+# outcome-free secondary analyses (ladder): subtype association of the picks, donor mixing of the states
+SUBTYPE_GROUPS = {"Basal": ["Basal"], "Her2": ["Her2"], "LumA": ["LumA"], "LumB": ["LumB"],
+                  "Luminal": ["LumA", "LumB"], "Normal": ["Normal"], "claudin-low": ["claudin-low"]}
+METABRIC_SUBTYPE_EXCLUDE = ["NC"]    # CLAUDIN_SUBTYPE "not classified" is not a subtype call
+MULTI_DONOR_FRAC = 0.5               # a state is multi-donor when no donor gives this share of its cells
+DONOR_MIXING_TOPK = 50               # one signature per state, so a state is not counted three times
 
 # ---- prediction thresholds ---------------------------------------------------------------
 P3_WITHIN_SUBTYPE_CINDEX = 0.6   # P3 as coded: passes if the C-index exceeds this within any subtype
