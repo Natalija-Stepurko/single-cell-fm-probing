@@ -1,6 +1,6 @@
 {
   "script": "report.py",
-  "timestamp_utc": "2026-10-05T13:41:20+00:00",
+  "timestamp_utc": "2026-10-07T15:48:01+00:00",
   "command": "src/scfm/stages/report.py",
   "args": {
     "data_dir": "data",
@@ -12,7 +12,7 @@
     "out_dir": "results/report",
     "dry_run": false
   },
-  "git_commit": "f6fce2c3f643696a091dc6b5546d53c356deb6a5",
+  "git_commit": "bf3a250aaddbce417d1851713d2f7687577257f7",
   "git_dirty": true,
   "versions": {
     "python": "3.12.3",
@@ -42,6 +42,7 @@
     "figures": [
       "fig_ladder",
       "fig_states",
+      "fig_states_all",
       "fig_added_value",
       "fig_stratify",
       "fig_replication",

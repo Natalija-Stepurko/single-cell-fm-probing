@@ -130,16 +130,17 @@ Not new: carrying single-cell states into bulk cohorts to test prognosis (Wu et 
 2013); testing foundation models against simple baselines on clinical tasks (Roman et al. 2025; Gross et
 al. 2024; Liu W et al. 2026).
 
-We found no prior study that combines the following: a foundation model used only to define cell states
-in a tumour atlas; those states carried as interpretable marker signatures into a disjoint bulk cohort
-with survival follow-up; a linear HVG-PCA arm run through the identical clustering, signature and
-scoring pipeline; every C-index read against a family-wise permutation null and a random-gene floor
-matched on size and expression; predictions committed before the data; and a replication in an
-independent cohort with signatures frozen before its outcomes were read. The contribution is
-methodological and the answer agrees with the benchmarks above: in TCGA no representation's best
-signature clears its family-wise null, and in METABRIC every foundation-model-minus-baseline margin is
-negative. The protective luminal states that HVG-PCA and scGPT find in the post-hoc reading are in line
-with Chen A et al. (2026), whose cross-cohort associations are protective.
+What this study adds is a different route to the clinical question: the foundation models decide which
+cells form a state, and those states are carried into patients as marker-gene signatures, beside states from
+a linear HVG-PCA method treated identically. I found no earlier comparison of foundation-model and linear
+cell states along this route. The models recover familiar biology (ERBB2-associated luminal, basal keratin
+and hormone-responsive luminal programmes that follow the PAM50 subtypes; Parker et al. 2009; Wirapati et al.
+2008), but that biology adds no survival information beyond the linear method, in TCGA or in METABRIC, which
+extends the cell-level and patient-level findings above (Kedzierska et al. 2025; Roman et al. 2025) to states
+the models define themselves. scGPT's apparent advantage in raw C-index disappears once random gene lists of
+the same size and expression are taken into account, the background effect Venet et al. (2011) described.
+States beat chance only when signatures predicting longer survival are counted, in line with Chen A et
+al. (2026), whose cross-cohort associations are protective.
 
 ## 6. Data sources and software
 
