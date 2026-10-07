@@ -712,7 +712,7 @@ check(P3_NPERM == L["monte_carlo"]["p3_permutations"], "P3 permutation count agr
 # ----------------------------------------------------------------------------- sections
 # Figures are numbered in the order they appear on the page; build() checks the order.
 FIGNO = {"fig_ladder": 1, "fig_added_value": 2, "fig_margin": 3, "fig_km": 4, "fig_states": 5,
-         "fig_subtype": 6, "fig_donor": 7, "fig_stratify": 8, "fig_replication": 9}
+         "fig_states_all": 6, "fig_subtype": 7, "fig_donor": 8, "fig_stratify": 9, "fig_replication": 10}
 
 
 def fig(name):
@@ -810,17 +810,17 @@ def header_html(today):
     h1 = "Cell states from two single-cell foundation models predict breast-cancer survival no better than a linear baseline"
     check(P2_ALL_FAIL and all(x < 0 for x in MARGINS) and NONE_CLEARS_PRIM, "headline")
     abstract = (
-        f"Do cell states found by single-cell foundation models carry prognostic information that a linear method "
-        f"misses? Cell states were defined in {n_(N_CELLS)} cells from {N_DONORS} donors of a breast-cancer atlas with "
-        f"zero-shot scGPT and Geneformer and with a linear baseline (principal components of highly variable genes, "
-        f"HVG-PCA), turned into marker-gene signatures and scored in {n_(N_PAT)} TCGA-BRCA tumours against outcome "
-        f"permutations, matched random gene sets and clinical references. In the pre-specified risk direction no "
-        f"representation's best signature cleared its family-wise permutation null (p = {pp['hvg_pca']} "
-        f"HVG-PCA, {pp['scgpt']} scGPT, {pp['geneformer']} Geneformer), and both foundation models' margins over the baseline were negative "
-        f"(scGPT {m2['scgpt']}, Geneformer {m2['geneformer']} in C-index). No pick showed a reproducible improvement "
-        f"over age and stage. With signatures fixed before outcomes were examined, all {WORD[len(MCMP)]} "
-        f"foundation-model-minus-baseline margins were negative in {n_(MEND['OS']['n'])} METABRIC patients. The "
-        f"result concerns marker-gene projections of the tested checkpoints, not everything their embeddings encode.")
+        f"Single-cell foundation models are reported to learn cell biology that simpler methods miss; I asked whether "
+        f"the cell states they find also carry survival information. In {n_(N_CELLS)} cells from {N_DONORS} "
+        f"breast-cancer donors, states were defined with zero-shot scGPT and Geneformer and with a linear baseline "
+        f"(principal components of highly variable genes, HVG-PCA), and each became a marker-gene signature. In "
+        f"{n_(N_PAT)} TCGA-BRCA tumours I tested whether each signature tracks survival, against shuffled survival, "
+        f"random gene lists of the same size and expression, and age, cancer stage and PAM50 subtype. The foundation "
+        f"models recovered recognisable breast-cancer programmes in states shared across more patients, but predicted "
+        f"survival no better than the baseline (C-index margins: scGPT {m2['scgpt']}, Geneformer {m2['geneformer']}) "
+        f"and showed no reproducible improvement over age and stage. With signatures fixed in advance, all "
+        f"{WORD[len(MCMP)]} foundation-model-minus-baseline margins were negative in {n_(MEND['OS']['n'])} METABRIC "
+        f"patients. The result concerns marker-gene signatures, not everything the embeddings encode.")
     gh = ('<svg viewBox="0 0 16 16" aria-hidden="true" width="17" height="17"><path fill="currentColor" d="M8 0C3.58 '
           '0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94'
           '-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-'
@@ -864,9 +864,11 @@ def result_html():
     check(all(P2C["sensitivity"][m]["ci"][0] < 0 < P2C["sensitivity"][m]["ci"][1] for m in FMS),
           "sensitivity margins span zero")
     clin = REF["clinical_full"]
-    f1 = (f"<p><strong>No representation beats chance selection.</strong> In the pre-specified risk direction the best "
-          f"of each representation's signatures stays inside its family-wise null (p = {pp['hvg_pca']} HVG-PCA, "
-          f"{pp['scgpt']} scGPT, {pp['geneformer']} Geneformer). Read in either direction (post hoc), HVG-PCA "
+    f1 = (f"<p><strong>No representation beats chance selection.</strong> The planned analysis counts a signature "
+          f"only when a higher score means worse survival. There, the best of each representation's hundreds of "
+          f"signatures does no better than the best signature on shuffled survival (p = {pp['hvg_pca']} HVG-PCA, "
+          f"{pp['scgpt']} scGPT, {pp['geneformer']} Geneformer). Counting protective signatures too (an unplanned "
+          f"analysis), HVG-PCA "
           f"(p = {ps['hvg_pca']}) and scGPT ({ps['scgpt']}) clear it; Geneformer ({ps['geneformer']}) does not, a "
           f"borderline result {GF_Z:.1f} Monte-Carlo standard errors above 0.05.</p>")
     f2 = (f"<p><strong>Neither foundation model is ahead of the baseline.</strong> Measured as distance above the "
@@ -934,14 +936,17 @@ def novelty_html():
     fm_or_dirs = {r["direction_tcga"] for r in SUBT_CSV if r["cohort"] == "TCGA" and r["model"] in SENS_CLEAR
                   and "family_max_sensitivity" in r["analyses"].split(";")}
     check(fm_or_dirs == {"protective"}, "the either-direction family maxima that clear are protective")
-    return f"""<h2 id="novelty">What is new, and what was known</h2>
-<p>We found no prior study that defines cell states with foundation models in a tumour single-cell atlas, carries them into an independent bulk cohort as marker-gene signatures, compares them with a linear HVG-PCA arm passed through the identical pipeline, reads every result against matched random gene sets and a family-wise permutation null, and replicates the frozen signatures in a second cohort; to our knowledge the combination is new.</p>
+    sc, hv = PICKS["primary"]["scgpt"], PICKS["primary"]["hvg_pca"]
+    check(sc["cindex"] > hv["cindex"] and sc["floor_mean"] > hv["floor_mean"] and P2C["primary"]["scgpt"]["margin"] < 0,
+          "scGPT: higher C and higher floor, negative margin")
+    return f"""<h2 id="novelty">What was known, and what this study shows</h2>
+<p>Earlier benchmarks found that simple methods match single-cell foundation models on cell-level tasks used zero-shot {cite('kedzierska')} and on perturbation prediction {cite('ahlmann', 'bendidi')}, and that foundation-model embeddings offer limited advantages for cancer patients' outcomes, whether used within single-cell cohorts {cite('roman')} or computed from bulk tumour profiles {cite('liuW')}. Carrying single-cell states into bulk cohorts to study survival is also established {cite('luca', 'wuSZ')}. This study takes a different route to the clinical question: the foundation models decide which cells form a state, and those states are carried into patients as gene signatures, beside states from a linear method treated identically. I found no earlier comparison of foundation-model and linear cell states along this route. Four observations follow, each set against what was known.</p>
 <ul class="known">
-<li><strong>Single-cell states carried to bulk outcome.</strong> EcoTyper defined prognostic cell states across carcinomas {cite('luca')}. In breast cancer, {REFS['wuSZ'][0]} related single-cell ecotypes to bulk outcome, and {REFS['chenA'][0]}, whose collection supplies {pct(CHEN_FRAC)} of this atlas's cells, found that the states whose associations held across cohorts were protective. Scissor {cite('sun')} uses the outcome to choose cells.</li>
-<li><strong>Foundation models and clinical outcome.</strong> Twelve single-cell foundation models offered limited advantages over simpler baselines for cancer patients' outcomes within single-cell cohorts {cite('roman')}; TCGA survival has been predicted from foundation-model embeddings of bulk profiles {cite('liuW')}.</li>
-<li><strong>Linear baselines.</strong> Simple baselines match foundation models in zero-shot cell-level tasks {cite('kedzierska')} and perturbation prediction {cite('ahlmann', 'bendidi')}. Random gene sets predict breast-cancer outcome {cite('venet')}, the reason for the matched-random floor.</li>
-</ul>
-<p>The result agrees with the limited foundation-model advantage reported by {REFS['roman'][0]}, and the states that clear the null in the either-direction reading are protective, as were the cross-cohort survivors of {REFS['chenA'][0]}.</p>"""
+<li><strong>The models recover familiar biology.</strong> Their states include an ERBB2-associated luminal programme, a basal keratin programme and a hormone-responsive luminal programme, and their scores follow the PAM50 intrinsic subtypes, the axes that carry most prognostic information in breast cancer {cite('parker', 'wirapati')}.</li>
+<li><strong>That biology adds no survival information beyond the linear method.</strong> The linear method finds the same luminal programme, and no foundation-model state predicts survival better than the baseline's, in TCGA or in METABRIC. This extends the cell-level and patient-level findings above {cite('kedzierska', 'roman')} to states the models define themselves.</li>
+<li><strong>An apparent advantage disappears against random genes.</strong> scGPT's pick has a higher C-index than the baseline's ({f3(sc['cindex'])} against {f3(hv['cindex'])}), but random gene lists of the same size and expression also score higher for it ({f3(sc['floor_mean'])} against {f3(hv['floor_mean'])}), and the advantage is gone once that is taken into account. Random gene sets predict breast-cancer outcome {cite('venet')}, and here that background differed between the representations.</li>
+<li><strong>The signal that holds is protective.</strong> States beat chance only when signatures predicting longer survival are counted (HVG-PCA and scGPT), and the states whose associations held across cohorts in {REFS['chenA'][0]}, whose collection supplies {pct(CHEN_FRAC)} of this atlas's cells, were also protective.</li>
+</ul>"""
 
 
 def scope_html():
@@ -1225,7 +1230,9 @@ def states_html():
 <p><strong>The baseline's pre-specified pick is a single-dataset artefact.</strong> Its cells are annotated as exhausted T cells, yet its markers are testis and colon genes (CEACAM7, TKTL1, FAM9C, INSL3), and none of the canonical T-cell markers ({", ".join(T_CELL_GENES)}) is among its 50 genes; it does include {", ".join(BASE_EXTRA_GENES["treg"])}, a regulatory-T-cell transcription factor, and the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}. It was picked because its random-gene floor is low ({f3(b["floor_mean"])}), which makes its margin large although its C-index ({f3(b["cindex"])}) is not. The pre-specified P2 margins are measured against it.</p>
 <p><strong>Geneformer's protective pick is a mixed-lineage state.</strong> Its markers are nuclear-retained transcripts and immediate-early genes, the profile of low-quality or dissociation-stressed cells.</p>
 <p>{fr('fig_states')} places the picks in each representation's two-dimensional uniform manifold approximation and projection (UMAP) of all {n_(N_CELLS)} cells.</p>
-{fig("fig_states")}"""
+{fig("fig_states")}
+<p>{fr('fig_states_all')} shows every state each representation produced, at each of the three clustering resolutions: {", ".join(f"{N_STATES[m]} for {NAME[m]}" for m in MODELS)}. The picks above are one state each out of these.</p>
+{fig("fig_states_all")}"""
 
 
 def subtype_html():
@@ -1778,7 +1785,7 @@ footer a{{color:var(--ink)}}
 """
 
 NAV_SUMMARY = [("question", "Question"), ("benchmark", "Benchmark"), ("result", "Result"), ("added", "Added value"),
-               ("replication", "Replication"), ("cellstates", "States"), ("novelty", "Novelty"), ("scope", "Scope"),
+               ("replication", "Replication"), ("cellstates", "States"), ("novelty", "Known & new"), ("scope", "Scope"),
                ("checked", "Checks")]
 NAV_TECH = [("technical", "Technical detail"), ("methods", "Methods"), ("predictions", "Predictions"),
             ("ladder", "Ladder in detail"), ("states", "Picked states"), ("subtype", "PAM50 subtype"),

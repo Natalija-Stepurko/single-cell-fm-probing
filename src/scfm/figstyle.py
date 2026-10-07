@@ -58,9 +58,13 @@ def xgrid(ax):
     ax.set_axisbelow(True)
 
 
-def save(fig, out: Path, name: str) -> Path:
+def save(fig, out: Path, name: str, dpi: int | None = None, colours: int | None = None) -> Path:
+    """Save as PNG; `colours` quantises to a palette, which keeps dense scatter plots small."""
     path = Path(out) / f"{name}.png"
-    fig.savefig(path, dpi=DPI, metadata={"Software": None})
+    fig.savefig(path, dpi=dpi or DPI, metadata={"Software": None})
     import matplotlib.pyplot as plt
     plt.close(fig)
+    if colours:
+        from PIL import Image
+        Image.open(path).convert("RGB").quantize(colours, dither=Image.Dither.NONE).save(path, optimize=True)
     return path

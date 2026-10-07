@@ -644,5 +644,31 @@
   "rc": 0,
   "dry_run": false,
   "params": "results/report/params.json"
+ },
+ {
+  "stage": "report",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.report"
+  ],
+  "started": 1791388015.346743,
+  "seconds": 6.9,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/report/params.json"
+ },
+ {
+  "stage": "report",
+  "cmd": [
+   "python",
+   "-m",
+   "scfm.stages.report"
+  ],
+  "started": 1791388075.3264408,
+  "seconds": 6.8,
+  "rc": 0,
+  "dry_run": false,
+  "params": "results/report/params.json"
  }
 ]

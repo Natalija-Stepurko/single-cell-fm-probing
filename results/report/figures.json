@@ -75,6 +75,30 @@
       ]
     },
     {
+      "name": "fig_states_all",
+      "file": "results/report/fig_states_all.png",
+      "produced": true,
+      "size": "wide",
+      "display_width_px": 1140,
+      "title": "Every cell state in each representation",
+      "question": "How does each representation divide the same cells into states?",
+      "shows": "The same UMAP embeddings as the previous figure, one row per representation and one column per clustering resolution. Each state kept for analysis (at least 200 cells) has its own colour; cells in smaller clusters are grey.",
+      "how_to_read": [
+        "Colours identify states within a panel only; they are not matched across panels.",
+        "Each kept state gives three signatures (top 25, 50 and 100 marker genes)."
+      ],
+      "data_files": [
+        "results/states/cells_hvg_pca.parquet",
+        "results/states/cells_scgpt.parquet",
+        "results/states/cells_geneformer.parquet",
+        "results/states/signatures.json"
+      ],
+      "pixels": [
+        1500,
+        1530
+      ]
+    },
+    {
       "name": "fig_added_value",
       "file": "results/report/fig_added_value.png",
       "produced": true,

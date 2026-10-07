@@ -33,7 +33,8 @@ from scfm import figstyle as S
 from scfm.provenance import record_params, relpath
 from scfm.survival import score_signature, zscore_genes
 
-FIGURES = ["fig_ladder", "fig_states", "fig_added_value", "fig_stratify", "fig_replication", "fig_km",
+FIGURES = ["fig_ladder", "fig_states", "fig_states_all", "fig_added_value", "fig_stratify", "fig_replication",
+           "fig_km",
            "fig_margin", "fig_subtype", "fig_donor"]
 ANALYSIS_NAME = {"primary": "Pre-specified", "sensitivity": "Sensitivity (post hoc)"}
 
@@ -195,6 +196,52 @@ def fig_ladder(D, out):
 
 
 # ---- 2. the states ----------------------------------------------------------------------------
+def state_colours(n: int) -> list:
+    """n distinct colours for cell states, spread around the hue circle in golden-ratio steps."""
+    import colorsys
+    return [colorsys.hls_to_rgb((0.11 + i * 0.618034) % 1.0, 0.52 + 0.12 * (i % 3 - 1), 0.62)
+            for i in range(n)]
+
+
+def fig_states_all(D, out):
+    """Every cell state of every representation: rows are representations, columns clustering resolutions."""
+    import matplotlib.pyplot as plt
+    files = D["files"]
+    if not all(files[f"cells_{m}"].exists() for m in S.MODELS):
+        print("  fig_states_all skipped: results/states/cells_<model>.parquet not present (stage states)")
+        return None
+    res_list = [str(r) for r in C.LEIDEN_RESOLUTIONS]
+    fig, axes = plt.subplots(len(S.MODELS), len(res_list), figsize=(S.WIDE, 10.2))
+    fig.subplots_adjust(left=0.08, right=0.99, top=0.95, bottom=0.01, wspace=0.03, hspace=0.12)
+    for i, m in enumerate(S.MODELS):
+        cells = pd.read_parquet(files[f"cells_{m}"])
+        xy = cells[["umap_1", "umap_2"]].to_numpy(float)
+        for j, res in enumerate(res_list):
+            ax = axes[i, j]
+            lab = cells[f"leiden_{res}"].astype(str)
+            size = lab.value_counts()
+            kept = [c for c in size.index if size[c] >= C.MIN_CELLS_PER_STATE]
+            n_sig = len(D["sigs"][m].get(res, {})) // len(C.MARKER_TOPK)
+            if len(kept) != n_sig:
+                raise ValueError(f"{m} {res}: {len(kept)} kept states in the UMAP file, "
+                                 f"{n_sig} in signatures.json")
+            ax.scatter(xy[:, 0], xy[:, 1], s=0.3, c=S.CELLS, lw=0, rasterized=True)
+            for c, col in zip(kept, state_colours(len(kept))):
+                sel = (lab == c).to_numpy()
+                ax.scatter(xy[sel, 0], xy[sel, 1], s=0.45, color=col, lw=0, rasterized=True)
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_visible(False)
+            ax.text(0.02, 0.98, f"{len(kept)} states", transform=ax.transAxes, ha="left", va="top",
+                    fontsize=S.FS_SMALL, color=S.INK)
+            if i == 0:
+                ax.set_title(f"resolution {res}", fontsize=S.FS_SMALL + 1, color=S.MUTED, pad=4)
+            if j == 0:
+                ax.set_ylabel(S.NAME[m], fontsize=S.FS_SMALL + 2, fontweight="bold", color=S.COL[m],
+                              rotation=90, labelpad=6)
+    return S.save(fig, out, "fig_states_all", dpi=150, colours=128)
+
+
 def fig_states(D, out):
     import matplotlib.pyplot as plt
     files = D["files"]
@@ -814,6 +861,17 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
             "programme_labels": labels,
             "data_files": [f[f"cells_{m}"] for m in S.MODELS] + [f["signatures"], f["composition"],
                                                                    f["ladder"]]},
+        "fig_states_all": {
+            "title": "Every cell state in each representation",
+            "question": "How does each representation divide the same cells into states?",
+            "shows": "The same UMAP embeddings as the previous figure, one row per representation and one "
+                     "column per clustering resolution. Each state kept for analysis (at least "
+                     f"{C.MIN_CELLS_PER_STATE} cells) has its own colour; cells in smaller clusters are "
+                     "grey.",
+            "how_to_read": ["Colours identify states within a panel only; they are not matched across "
+                            "panels.",
+                            "Each kept state gives three signatures (top 25, 50 and 100 marker genes)."],
+            "data_files": [f[f"cells_{m}"] for m in S.MODELS] + [f["signatures"]]},
         "fig_added_value": {
             "title": "Each pick added to a Cox model of age + stage",
             "question": "Does any pick add prognostic information to routine clinical variables?",
@@ -1017,6 +1075,7 @@ def main(argv=None):
     S.setup()
     D = load(args)
     paths = {"fig_ladder": fig_ladder(D, out), "fig_states": fig_states(D, out),
+             "fig_states_all": fig_states_all(D, out),
              "fig_added_value": fig_added_value(D, out), "fig_stratify": fig_stratify(D, out),
              "fig_replication": fig_replication(D, out)}
     paths["fig_km"], km = fig_km(D, out)
