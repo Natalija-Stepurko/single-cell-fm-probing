@@ -41,6 +41,10 @@ Project page (summary, then the full technical report on the same page):
 Design, predictions and corrections: [`docs/DESIGN.md`](docs/DESIGN.md). Related work:
 [`research/literature.md`](research/literature.md).
 
+This is study 1 of a breast-cancer series. Study 2, [brca-target-evidence](https://github.com/Natalija-Stepurko/brca-target-evidence),
+asks whether adding protein and DNA evidence to RNA picks better drug targets, and reuses this study's
+50,002-cell atlas to check where its candidates are expressed.
+
 ## What was done
 
 1. **Atlas.** 50,002 cells from 152 donors in 8 CELLxGENE datasets (nine breast-carcinoma disease

@@ -1846,6 +1846,7 @@ def build():
 <footer>
 <div>Data: CELLxGENE Census release {C.CENSUS_VERSION} (breast-carcinoma donors, primary data) · TCGA-BRCA from UCSC Xena {cite('goldman')}, survival from the TCGA Pan-Cancer Clinical Data Resource {cite('liuJ')} · METABRIC from the cBioPortal datahub. Data are downloaded at run time and not redistributed.</div>
 <div>Code: <a href="{REPO}">single-cell-fm-probing</a> · <a href="{DESIGN_URL}">design document</a></div>
+<div>Study 2 of this series, <a href="https://natalija-stepurko.github.io/brca-target-evidence/">Does the protein layer pick better drug targets?</a>, reuses this atlas to check where its candidate targets are expressed.</div>
 </footer>
 </div>
 <script>{NAV_JS}</script>
