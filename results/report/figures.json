@@ -28,9 +28,9 @@
       "produced": true,
       "size": "wide",
       "display_width_px": 1140,
-      "title": "Where the picked states sit in each representation",
-      "question": "What are the picked cell states, and are they shared programmes or single patients' cells?",
-      "shows": "Uniform manifold approximation and projection (UMAP) of all atlas cells per representation (grey), the pre-specified pick in the representation's colour and the sensitivity pick in a lighter tint, each labelled with its programme, cell count, donors (top-donor share) and datasets (top-dataset share).",
+      "title": "Where the selected states sit in each representation",
+      "question": "What are the selected cell states, and are they shared programmes or single patients' cells?",
+      "shows": "Uniform manifold approximation and projection (UMAP) of all atlas cells per representation (grey), the pre-specified selected state in the representation's colour and the post hoc selected state in a lighter tint, each labelled with its programme, cell count, donors (top-donor share) and datasets (top-dataset share).",
       "how_to_read": [
         "Each panel is its own embedding; positions are not comparable across panels.",
         "A top-donor share near 100% means the state is one patient's cells."

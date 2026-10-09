@@ -527,8 +527,9 @@ def data_uri(p: Path):
     return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
 
 
-def figure(name, label):
-    """A result figure from results/report with its caption from figures.json."""
+def figure(name, label, clip=None, clip_note=""):
+    """A result figure from results/report with its caption from figures.json. With `clip`, the image shows only
+    that fraction of its height until the reader opens it (the page works in full without JavaScript)."""
     meta = FIG[name]
     p = ROOT / meta["file"]
     reads = meta["how_to_read"]
@@ -539,6 +540,10 @@ def figure(name, label):
         w, h = meta["pixels"]
         img = (f'<div class="imgscroll"><img src="{data_uri(p)}" width="{w}" height="{h}" '
                f'alt="{esc(meta["title"])}"></div>')
+        if clip:
+            img = (f'<div class="clip" data-frac="{clip}">{img}</div>'
+                   f'<button class="cliptoggle" type="button" aria-expanded="false">Show the full figure</button>'
+                   f'<p class="clipnote">{esc(clip_note)}</p>')
     else:
         img = (f'<p class="missing">{esc(meta["file"])} is not in this build; <code>scfm run report</code> writes it '
                f'when its inputs are present.</p>')
@@ -711,12 +716,14 @@ check(P3_NPERM == L["monte_carlo"]["p3_permutations"], "P3 permutation count agr
 
 # ----------------------------------------------------------------------------- sections
 # Figures are numbered in the order they appear on the page; build() checks the order.
-FIGNO = {"fig_ladder": 1, "fig_added_value": 2, "fig_margin": 3, "fig_km": 4, "fig_states": 5,
-         "fig_states_all": 6, "fig_subtype": 7, "fig_donor": 8, "fig_stratify": 9, "fig_replication": 10}
+FIGNO = {"fig_significance": "1A", "fig_advantage": "1B", "fig_added": 2, "fig_repl_margins": 3, "fig_learned": 4,
+         "fig_states": 5, "fig_states_all": 6, "fig_subtype_utility": 7,
+         "fig_ladder": 8, "fig_km": 9, "fig_subtype": 10, "fig_donor": 11, "fig_added_value": 12, "fig_stratify": 13,
+         "fig_replication": 14}
 
 
-def fig(name):
-    return figure(name, f"Figure {FIGNO[name]}")
+def fig(name, **kw):
+    return figure(name, f"Figure {FIGNO[name]}", **kw)
 
 
 def fr(name):
@@ -805,22 +812,27 @@ PICK_C = [PICKS[a][m]["cindex"] for a in PICKS for m in MODELS]
 
 
 def header_html(today):
-    pp = {m: pv(fw_prim[m]["fw_p"]) for m in MODELS}
-    m2 = {m: sgn(P2C["primary"][m]["margin"]) for m in FMS}
-    h1 = "Cell states from two single-cell foundation models predict breast-cancer survival no better than a linear baseline"
+    m2 = {m: P2C["primary"][m]["margin"] for m in FMS}
+    h1 = "Do single-cell foundation models discover cell states that improve survival prediction?"
     check(P2_ALL_FAIL and all(x < 0 for x in MARGINS) and NONE_CLEARS_PRIM, "headline")
+    check(all(DON["checks"][f"{m}_fewer_single_donor_share_than_baseline"] for m in FMS), "abstract: FMs less donor-specific")
+    check(all(not adds(AV_PICKS[(a, m, "age+stage")]) for a in PICKS for m in MODELS), "abstract: no reproducible added value")
+    lede = ("In this benchmark, no. Marker-gene signatures derived from zero-shot scGPT and Geneformer did not "
+            "outperform signatures from a linear baseline (PCA), and neither model added reproducible prognostic "
+            "value beyond age and stage.")
     abstract = (
-        f"Single-cell foundation models are reported to learn cell biology that simpler methods miss; I asked whether "
-        f"the cell states they find also carry survival information. In {n_(N_CELLS)} cells from {N_DONORS} "
-        f"breast-cancer donors, states were defined with zero-shot scGPT and Geneformer and with a linear baseline "
-        f"(principal components of highly variable genes, HVG-PCA), and each became a marker-gene signature. In "
-        f"{n_(N_PAT)} TCGA-BRCA tumours I tested whether each signature tracks survival, against shuffled survival, "
-        f"random gene lists of the same size and expression, and age, cancer stage and PAM50 subtype. The foundation "
-        f"models recovered recognisable breast-cancer programmes in states shared across more patients, but predicted "
-        f"survival no better than the baseline (C-index margins: scGPT {m2['scgpt']}, Geneformer {m2['geneformer']}) "
-        f"and showed no reproducible improvement over age and stage. With signatures fixed in advance, all "
-        f"{WORD[len(MCMP)]} foundation-model-minus-baseline margins were negative in {n_(MEND['OS']['n'])} METABRIC "
-        f"patients. The result concerns marker-gene signatures, not everything the embeddings encode.")
+        f"<p><strong>Can representations learned from millions of single cells find clinically useful tumour cell "
+        f"states that a linear method misses?</strong> I compared two single-cell foundation models, scGPT and "
+        f"Geneformer, with a principal-component baseline on the same atlas of {n_(N_CELLS)} breast-cancer cells. "
+        f"Each representation was clustered into cell states, each state became a marker-gene signature, and every "
+        f"signature was tested against patient survival in TCGA-BRCA.</p>"
+        f"<p><strong>Neither foundation model showed an advantage over the baseline.</strong> In the planned analysis "
+        f"no representation's best survival association exceeded a selection-aware permutation test; the signatures "
+        f"did not reproducibly improve prediction beyond age and stage; and the lack of a foundation-model advantage "
+        f"held in an independent METABRIC cohort with every signature fixed in advance.</p>"
+        f"<p>The models did differ in what they represented: their cell states were less dominated by single donors "
+        f"than the baseline's. The study separates that difference in representation from an improvement in clinical "
+        f"usefulness, which it did not find.</p>")
     gh = ('<svg viewBox="0 0 16 16" aria-hidden="true" width="17" height="17"><path fill="currentColor" d="M8 0C3.58 '
           '0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94'
           '-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-'
@@ -828,14 +840,298 @@ def header_html(today):
           ' 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15'
           ' 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16'
           ' 8c0-4.42-3.58-8-8-8Z"/></svg>')
+    os_ = MEND["OS"]
+    stats = (f'<div class="stats">'
+             f'<div><b>{n_(N_CELLS)}</b><span>single cells · {N_DONORS} donors</span></div>'
+             f'<div><b>{n_(N_PAT)}</b><span>TCGA-BRCA patients · {N_EV} deaths</span></div>'
+             f'<div><b>{n_(os_["n"])}</b><span>METABRIC patients · {n_(os_["events"])} deaths</span></div></div>')
     return f"""<header>
 <p class="eyebrow"><span>Single-cell foundation models · breast cancer · survival</span></p>
 <h1>{h1}</h1>
-<p class="scope">Zero-shot scGPT and Geneformer · marker-gene signatures · TCGA-BRCA and an independent METABRIC replication</p>
+<p class="lede">{lede}</p>
+{stats}
+<p class="scope">Same atlas, the same downstream pipeline for every representation, outcome-permutation controls and an independent cohort. Conclusions apply to the tested checkpoints and their marker-gene signatures.</p>
 <p class="byline"><span class="nw">Natalija Stepurko</span> · <span class="nw">{today:%B %Y}</span> · <a class="nw" href="{SITE}">natalija-stepurko.com</a></p>
-<p class="abstract">{abstract}</p>
+<div class="abstract">{abstract}</div>
+<p class="scopenote"><strong>Scope.</strong> The study evaluates marker-gene signatures from two zero-shot checkpoints, not everything their embeddings encode.</p>
 <a class="repo" href="{REPO}">{gh}<span><b>All the code is public.</b> Every number and figure on this page comes from the pipeline in this repository: atlas assembly, embeddings, the controls and the METABRIC replication.</span><span class="repo-path">Natalija-Stepurko/single-cell-fm-probing</span></a>
 </header>"""
+
+
+# ----------------------------------------------------------------------------- summary figures (inline SVG)
+def svg_figure(fid, title, body_svg, caption):
+    """A numbered summary figure drawn here from results/, so it scales to the page width."""
+    return (f'<figure class="result" id="{fid}"><figcaption><span class="fk">{fr(fid)}</span> {esc(title)}</figcaption>'
+            f'<div class="svgfit">{body_svg}</div><div class="rtext">{caption}</div></figure>')
+
+
+def _axis(b, x0, x1, y, lo, hi, ticks, fmt, label=None):
+    X = lambda v: x0 + (v - lo) / (hi - lo) * (x1 - x0)
+    b.append(line(x0, y, x1, y, stroke=AXIS))
+    for t in ticks:
+        b.append(line(X(t), y, X(t), y + 5, stroke=AXIS))
+        b.append(T(X(t), y + 17, fmt(t), 11, MUTED, anchor="middle", mono=True))
+    if label:
+        b.append(T((x0 + x1) / 2, y + 38, label, 12, MUTED, anchor="middle"))
+    return X
+
+
+def fig_pipeline():
+    """Atlas -> three representations -> TCGA scoring -> identical controls; METABRIC with frozen signatures."""
+    W, H = 980, 300
+    b = []
+    rows_ = {"hvg_pca": 30, "scgpt": 96, "geneformer": 162}
+    RH = 54
+    b.append(box(10, 30, 150, 186))
+    b.append(cells_glyph(14, 44, n=30, seed=5, fill=MUTED))
+    b.append(cells_glyph(14, 92, n=26, seed=9, fill="#8A9298"))
+    b.append(T(85, 166, "breast-cancer", 12, INK, anchor="middle", weight=600))
+    b.append(T(85, 182, "single-cell atlas", 12, INK, anchor="middle", weight=600))
+    b.append(T(85, 202, f"{n_(N_CELLS)} cells · {N_DONORS} donors", 10, MUTED, anchor="middle", mono=True))
+    subs = {"hvg_pca": "linear baseline", "scgpt": "foundation model", "geneformer": "foundation model"}
+    for m, y in rows_.items():
+        b.append(arrow(160, 123, 206, y + RH / 2))
+        b.append(box(210, y, 330, RH, stroke=COL[m], sw=1.5))
+        b.append(f'<rect x="210" y="{y}" width="5" height="{RH}" rx="2" fill="{COL[m]}"/>')
+        b.append(T(226, y + 19, NAME[m], 12.5, INK, weight=600))
+        b.append(T(226, y + 37, subs[m], 10, MUTED, mono=True))
+        b.append(T(360, y + 27, "cluster cells  →  marker genes", 11, MUTED))
+        b.append(arrow(540, y + RH / 2, 586, 123))
+    b.append(box(590, 66, 170, 114))
+    b.append(T(675, 92, "score signatures", 12, INK, anchor="middle", weight=600))
+    b.append(T(675, 108, "in bulk tumours", 12, INK, anchor="middle", weight=600))
+    b.append(T(675, 132, "TCGA-BRCA", 10.5, MUTED, anchor="middle", mono=True))
+    b.append(T(675, 148, f"{n_(N_PAT)} patients", 10.5, MUTED, anchor="middle", mono=True))
+    b.append(arrow(760, 123, 796, 123))
+    b.append(box(800, 50, 170, 146, fill="#F2F4F5"))
+    for i, s in enumerate(["compare survival", "prediction under", "identical controls"]):
+        b.append(T(885, 76 + i * 16, s, 12, INK, anchor="middle", weight=600))
+    for i, s in enumerate(["shuffled outcomes", "matched random genes", "clinical variables"]):
+        b.append(T(885, 138 + i * 15, s, 10, MUTED, anchor="middle", mono=True))
+    b.append(box(590, 240, 380, 46, fill=PANEL, stroke=INK, dash="5 3"))
+    b.append(T(780, 257, "independent replication: METABRIC", 12, INK, anchor="middle", weight=600))
+    b.append(T(780, 274, f"{n_(MEND['OS']['n'])} patients · signatures and directions frozen first", 10.5, MUTED, anchor="middle", mono=True))
+    b.append(arrow(675, 180, 675, 236, dash="4 3"))
+    return svg(W, H, "".join(b), "From one single-cell atlas through three representations to survival in TCGA, "
+               "with independent replication in METABRIC")
+
+
+def fig_significance():
+    """Figure 1A: the selection-aware permutation p of each representation's best signature, two analyses."""
+    W, H = 980, 268
+    x0, x1 = 250, 900
+    lo, hi = 0.0, 0.4
+    b = []
+    X = _axis(b, x0, x1, 222, lo, hi, [0, 0.05, 0.1, 0.2, 0.3, 0.4], lambda t: f"{t:g}",
+              "p-value of the best signature against 10,000 shuffled outcomes")
+    b.append(line(X(0.05), 14, X(0.05), 222, stroke=INK, sw=1.2, dash="4 3"))
+    b.append(T(X(0.05) + 6, 16, "p = 0.05", 11, INK, mono=True))
+    groups = [("Pre-specified: higher score predicts worse survival", fw_prim, 40),
+              ("Post hoc: risk or protective association", fw_sens, 128)]
+    for title, fw, y0 in groups:
+        b.append(T(10, y0, title, 12, INK, weight=600))
+        for i, m in enumerate(MODELS):
+            y = y0 + 22 + i * 20
+            p = fw[m]["fw_p"]
+            b.append(T(24, y, NAME[m], 12, INK))
+            b.append(line(x0, y, x1, y, stroke=RULE))
+            filled = p < C.ALPHA
+            b.append(f'<circle cx="{X(p):.1f}" cy="{y}" r="6" fill="{COL[m] if filled else PANEL}" stroke="{COL[m]}" stroke-width="2"/>')
+            b.append(T(max(X(p) + 12, X(C.ALPHA) + 8), y, f"p = {pv(p)}", 11, MUTED, mono=True, halo=True))
+    return svg(W, H, "".join(b), "Selection-aware permutation p-values per representation, pre-specified and post hoc")
+
+
+def fig_advantage():
+    """Figure 1B: foundation model minus PCA, above-random-gene margin, TCGA, selection-aware bootstrap."""
+    W, H = 980, 250
+    x0, x1 = 250, 780
+    lo, hi = -0.10, 0.04
+    b = []
+    X = _axis(b, x0, x1, 206, lo, hi, [-0.10, -0.08, -0.06, -0.04, -0.02, 0, 0.02, 0.04], lambda t: f"{t:+.2f}" if t else "0",
+              "advantage over PCA in C-index, after subtracting matched random-gene performance")
+    b.append(line(X(0), 14, X(0), 206, stroke=INK, sw=1.2))
+    b.append(T(X(0) - 8, 16, "← favours PCA", 11, MUTED, anchor="end"))
+    b.append(T(X(0) + 8, 16, "favours the foundation model →", 11, MUTED))
+    rows_ = [("Pre-specified", None, 44)] + [(None, ("primary", m), 66 + i * 24) for i, m in enumerate(FMS)] + \
+            [("Post hoc: risk or protective", None, 128)] + [(None, ("sensitivity", m), 150 + i * 24) for i, m in enumerate(FMS)]
+    for head, key, y in rows_:
+        if head:
+            b.append(T(10, y, head, 12, INK, weight=600)); continue
+        a, m = key
+        d = P2C[a][m]
+        lo_, hi_ = d["ci"]
+        b.append(T(24, y, f"{NAME[m]} minus PCA", 12, INK))
+        b.append(line(X(lo_), y, X(hi_), y, stroke=COL[m], sw=2.2))
+        b.append(f'<circle cx="{X(d["margin"]):.1f}" cy="{y}" r="6" fill="{COL[m]}"/>')
+        b.append(T(x1 + 8, y, f"{sgn(d['margin'])}  [{sgn(lo_)}, {sgn(hi_)}]", 10.5, MUTED, mono=True))
+    return svg(W, H, "".join(b), "Foundation model minus PCA margins with 95% selection-aware intervals")
+
+
+def fig_added():
+    """Figure 2: change in cross-validated C when each selected signature (and the published score) is added to age + stage."""
+    items = [(("primary", m), f"{NAME[m]} · pre-specified", COL[m]) for m in MODELS] + \
+            [(("sensitivity", m), f"{NAME[m]} · post hoc, protective", COL[m]) for m in MODELS] + \
+            [(None, "published proliferation score", COL["prolif"])]
+    vals = []
+    for key, _, _ in items:
+        r = AV_PICKS[(key[0], key[1], "age+stage")] if key else AV_PROLIF["age+stage"]
+        vals.append((r["delta_cindex_cv_nested_mean"], r["delta_cindex_cv_nested_lo"], r["delta_cindex_cv_nested_hi"]))
+    lo = min(v[1] for v in vals) - 0.002
+    hi = max(v[2] for v in vals) + 0.002
+    lo, hi = min(lo, -0.006), max(hi, 0.012)
+    W, H = 980, 64 + 26 * len(items) + 60
+    x0, x1 = 300, 900
+    b = []
+    yax = 40 + 26 * len(items) + 10
+    ticks = [t / 1000 for t in range(int(round(lo * 1000)) // 2 * 2, int(round(hi * 1000)) + 1, 2)]
+    X = _axis(b, x0, x1, yax, lo, hi, ticks, lambda t: f"{t:+.3f}" if abs(t) > 1e-9 else "0",
+              "change in cross-validated C-index when the signature is added to age + stage")
+    b.append(line(X(0), 14, X(0), yax, stroke=INK, sw=1.2))
+    b.append(T(X(0) + 8, 16, "improves on age + stage →", 11, MUTED))
+    for i, ((key, lab, col), (mu, l, h)) in enumerate(zip(items, vals, strict=True)):
+        y = 44 + i * 26
+        if key is None:
+            b.append(line(10, y - 13, x1, y - 13, stroke=RULE))
+        b.append(T(10, y, lab, 12, INK))
+        b.append(line(X(l), y, X(h), y, stroke=col, sw=2.2))
+        b.append(f'<circle cx="{X(mu):.1f}" cy="{y}" r="5.5" fill="{col}"/>')
+        b.append(T(x1 + 8, y, sgn(mu, 4), 10.5, MUTED, mono=True))
+    return svg(W, H, "".join(b), "Change in cross-validated C-index from adding each signature to age and stage")
+
+
+def fig_replication_margins():
+    """Figure 3: foundation model minus PCA in TCGA (discovery) and METABRIC OS / DSS (frozen signatures)."""
+    def met(analysis, ep, m):
+        hit = [c for c in (CMP_PRIM if analysis == "primary" else CMP_SENS)
+               if c["endpoint"] == ep and c["fm"].split(":")[0] == m]
+        check(len(hit) == 1, f"one METABRIC comparison for {analysis}/{ep}/{m}")
+        return hit[0]["margin"], hit[0]["ci"]
+    blocks = [("TCGA-BRCA · overall survival · discovery", lambda a, m: (P2C[a][m]["margin"], P2C[a][m]["ci"])),
+              ("METABRIC · overall survival · frozen", lambda a, m: met(a, "OS", m)),
+              ("METABRIC · disease-specific survival · frozen", lambda a, m: met(a, "DSS", m))]
+    x0, x1 = 330, 880
+    lo, hi = -0.10, 0.04
+    rows_per_block = 4
+    W = 980
+    H = 40 + len(blocks) * (30 + rows_per_block * 21 + 10) + 58
+    b = []
+    yax = H - 54
+    X = _axis(b, x0, x1, yax, lo, hi, [-0.10, -0.08, -0.06, -0.04, -0.02, 0, 0.02, 0.04],
+              lambda t: f"{t:+.2f}" if t else "0", "advantage over PCA in C-index, after subtracting matched random-gene performance")
+    b.append(line(X(0), 14, X(0), yax, stroke=INK, sw=1.2))
+    b.append(T(X(0) - 8, 16, "← favours PCA", 11, MUTED, anchor="end"))
+    b.append(T(X(0) + 8, 16, "favours the foundation model →", 11, MUTED))
+    y = 40
+    for title, get in blocks:
+        b.append(T(10, y, title, 12, INK, weight=600))
+        y += 22
+        for a in ("primary", "sensitivity"):
+            for m in FMS:
+                mu, (l, h) = get(a, m)
+                lab = f"{NAME[m]} · {'pre-specified' if a == 'primary' else 'post hoc'}"
+                b.append(T(24, y, lab, 11.5, INK if a == "primary" else MUTED))
+                b.append(line(X(l), y, X(h), y, stroke=COL[m], sw=2.2 if a == "primary" else 1.4))
+                b.append(f'<circle cx="{X(mu):.1f}" cy="{y}" r="5" fill="{COL[m] if a == "primary" else PANEL}" stroke="{COL[m]}" stroke-width="2"/>')
+                b.append(T(x1 + 8, y, sgn(mu), 10.5, MUTED, mono=True))
+                y += 21
+        y += 18
+    return svg(W, H, "".join(b), "Foundation model minus PCA in TCGA and in METABRIC with frozen signatures")
+
+
+def fig_learned():
+    """Figure 4: what each representation's selected states are (A) and how donor-specific its states are (B)."""
+    W, H = 980, 300
+    b = [T(10, 16, "A · The selected cell states", 12, INK, weight=600),
+         T(560, 16, "B · States drawn mostly from one donor", 12, INK, weight=600)]
+    for i, m in enumerate(MODELS):
+        x = 10 + i * 178
+        b.append(box(x, 34, 166, 236, stroke=COL[m], sw=1.5))
+        b.append(f'<rect x="{x}" y="34" width="166" height="5" rx="2" fill="{COL[m]}"/>')
+        b.append(T(x + 12, 58, NAME[m], 13, INK, weight=600))
+        for j, (a, lab) in enumerate([("primary", "pre-specified (risk)"), ("sensitivity", "post hoc (protective)")]):
+            yy = 92 + j * 92
+            b.append(T(x + 12, yy, lab.upper(), 9.5, MUTED, mono=True, weight=600))
+            words = programme(a, m).split(" ")
+            ln, cur = [], ""
+            for w_ in words:
+                if len(cur) + len(w_) + 1 > 18:
+                    ln.append(cur); cur = w_
+                else:
+                    cur = f"{cur} {w_}".strip()
+            ln.append(cur)
+            for k, s in enumerate(ln):
+                b.append(T(x + 12, yy + 22 + k * 17, s, 12.5, INK))
+    x0, x1 = 660, 960
+    X = lambda v: x0 + v / 0.6 * (x1 - x0)
+    for t in (0, 0.2, 0.4, 0.6):
+        b.append(line(X(t), 40, X(t), 236, stroke=RULE))
+        b.append(T(X(t), 250, f"{t * 100:.0f}%", 10.5, MUTED, anchor="middle", mono=True))
+    for i, m in enumerate(MODELS):
+        y = 70 + i * 60
+        d = DPR[m]
+        b.append(T(560, y, NAME[m], 12, INK))
+        b.append(f'<rect x="{x0}" y="{y - 13}" width="{X(d["share_single_donor"]) - x0:.1f}" height="26" rx="2" fill="{COL[m]}"/>')
+        b.append(T(X(d["share_single_donor"]) + 8, y, f"{pct(d['share_single_donor'])}", 11, INK, mono=True))
+        b.append(T(X(d["share_single_donor"]) + 8, y + 15, f"{d['n_single_donor']} of {d['n_states']}", 10, MUTED, mono=True))
+    b.append(T(810, 272, f"share of states with ≥ {pct(C.SINGLE_DONOR_FRAC)} of cells from one donor", 11, MUTED, anchor="middle"))
+    return svg(W, H, "".join(b), "Programmes of the selected states per representation, and the share of donor-dominated states")
+
+
+def fig_subtype_utility():
+    """Figure 7: PAM50 association of each selected signature against its added value over age + stage."""
+    pts = []
+    for a in ("primary", "sensitivity"):
+        for m in MODELS:
+            pts.append((float(SUB[(a, m)][0]["epsilon2"]), AV_PICKS[(a, m, "age+stage")]["delta_cindex_cv_nested_mean"],
+                        COL[m], "circle" if a == "primary" else "diamond", f"{NAME[m]}: {programme(a, m)}"))
+    pts.append((float(SUB_REF[0]["epsilon2"]), AV_PROLIF["age+stage"]["delta_cindex_cv_nested_mean"], COL["prolif"],
+                "square", "published proliferation score"))
+    W, H = 980, 380
+    x0, x1, y0, y1 = 90, 700, 30, 310
+    xl, xh = 0.0, 0.7
+    yl = min(p[1] for p in pts) - 0.002
+    yh = max(p[1] for p in pts) + 0.002
+    X = lambda v: x0 + (v - xl) / (xh - xl) * (x1 - x0)
+    Y = lambda v: y1 - (v - yl) / (yh - yl) * (y1 - y0)
+    b = [line(x0, y1, x1, y1, stroke=AXIS), line(x0, y0, x0, y1, stroke=AXIS), line(x0, Y(0), x1, Y(0), stroke=INK, dash="4 3")]
+    for t in (0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
+        b.append(T(X(t), y1 + 16, f"{t:.1f}", 10.5, MUTED, anchor="middle", mono=True))
+    for t in [v / 1000 for v in range(int(yl * 1000) // 2 * 2, int(yh * 1000) + 2, 2)]:
+        if yl <= t <= yh:
+            b.append(T(x0 - 8, Y(t), f"{t:+.3f}" if abs(t) > 1e-9 else "0", 10.5, MUTED, anchor="end", mono=True))
+    b.append(T((x0 + x1) / 2, y1 + 40, "association with PAM50 subtype in TCGA (ε²)", 12, MUTED, anchor="middle"))
+    b.append(f'<text x="22" y="{(y0 + y1) / 2}" transform="rotate(-90 22 {(y0 + y1) / 2})" text-anchor="middle" '
+             f'style="font-family:{SANS};font-size:12px;fill:{MUTED}">change in cross-validated C-index over age + stage</text>')
+    for xv, yv, col, shape, lab in pts:
+        cx, cy = X(xv), Y(yv)
+        if shape == "circle":
+            b.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="7" fill="{col}"/>')
+        elif shape == "diamond":
+            b.append(f'<path d="M{cx:.1f},{cy - 8:.1f} L{cx + 8:.1f},{cy:.1f} L{cx:.1f},{cy + 8:.1f} L{cx - 8:.1f},{cy:.1f} Z" fill="{PANEL}" stroke="{col}" stroke-width="2.2"/>')
+        else:
+            b.append(f'<rect x="{cx - 6.5:.1f}" y="{cy - 6.5:.1f}" width="13" height="13" fill="{col}"/>')
+    ly = 46
+    for xv, yv, col, shape, lab in pts:
+        if shape == "circle":
+            b.append(f'<circle cx="728" cy="{ly}" r="6" fill="{col}"/>')
+        elif shape == "diamond":
+            b.append(f'<path d="M728,{ly - 7} L735,{ly} L728,{ly + 7} L721,{ly} Z" fill="{PANEL}" stroke="{col}" stroke-width="2"/>')
+        else:
+            b.append(f'<rect x="722" y="{ly - 6}" width="12" height="12" fill="{col}"/>')
+        words, lines_, cur = lab.split(" "), [], ""
+        for w_ in words:
+            if len(cur) + len(w_) + 1 > 30:
+                lines_.append(cur); cur = w_
+            else:
+                cur = f"{cur} {w_}".strip()
+        lines_.append(cur)
+        for k, s in enumerate(lines_):
+            b.append(T(744, ly + k * 14, s, 11, INK))
+        ly += 14 * len(lines_) + 12
+    b.append(T(722, 338, "● pre-specified selection", 10, MUTED, mono=True))
+    b.append(T(722, 352, "◇ post hoc selection", 10, MUTED, mono=True))
+    b.append(T(722, 366, "■ published reference", 10, MUTED, mono=True))
+    return svg(W, H, "".join(b), "Subtype association against added prognostic value for the six selected signatures")
 
 
 # ----------------------------------------------------------------------------- summary
@@ -845,124 +1141,172 @@ def question_html():
 
 
 def benchmark_html():
-    return f"""<h2 id="benchmark">A fair benchmark</h2>
-{panel(fig_flow(), "One atlas, three views, one patient cohort, one ladder")}
-<p>The three representations share everything except the representation itself: the same {n_(N_CELLS)} cells, the same Leiden clustering, marker ranking and gene universe, the same scoring of each state's markers in {n_(N_PAT)} TCGA-BRCA tumours, and the same survival statistics. Each representation's pick is the state whose signature lies furthest above its random-gene floor. Every result is read against three controls:</p>
-<ul class="ctl">
-<li><strong>Family-wise permutation null.</strong> Outcomes are permuted {n_(N_PERM)} times and the best of a representation's {min(N_SIGS.values())}–{max(N_SIGS.values())} signatures is kept each time, so the null includes picking a winner.</li>
-<li><strong>Random gene sets matched for size and expression.</strong> In breast cancer most random gene sets predict outcome {cite('venet')}; {N_FLOOR} per signature give its floor.</li>
-<li><strong>Clinical references.</strong> Age and stage, the PAM50 intrinsic subtype {cite('parker')} and the published 11-gene proliferation score {cite('nielsen')}.</li>
-</ul>"""
+    rows_ = [
+        ("Selection-aware permutation test",
+         f"Could the best signature look predictive only because hundreds were tested? Outcomes are shuffled {n_(N_PERM)} times and the best of a representation's {min(N_SIGS.values())}–{max(N_SIGS.values())} signatures is kept each time."),
+        ("Matched random-gene benchmark",
+         f"Does a signature beat an arbitrary gene set of the same size and expression? In breast cancer most random gene sets predict outcome {cite('venet')}; {N_FLOOR} are drawn per signature."),
+        ("PCA baseline", "Does pretraining add anything to a simple linear representation of the same cells? Principal components of the highly variable genes (HVG-PCA, called PCA on this page) go through the identical pipeline."),
+        ("Clinical references", f"Does a signature improve on what clinicians already have? Age and stage, the PAM50 intrinsic subtype {cite('parker')} and the published 11-gene proliferation score {cite('nielsen')}."),
+        ("METABRIC replication", "Does a selected signature behave the same way in entirely different patients? Signatures and their directions are frozen before METABRIC outcomes are examined."),
+    ]
+    tbl = ('<div class="scroll"><table class="ctrl"><thead><tr><th>control</th><th>the question it answers</th></tr></thead><tbody>'
+           + "".join(f"<tr><td><strong>{a}</strong></td><td>{b_}</td></tr>" for a, b_ in rows_) + "</tbody></table></div>")
+    return f"""<h2 id="benchmark">How the benchmark works</h2>
+{panel(fig_pipeline(), "From single cells to patient outcomes")}
+<p>The three representations share everything except the representation itself: the same {n_(N_CELLS)} cells, the same Leiden clustering, marker ranking and gene universe, the same scoring of each state's markers in {n_(N_PAT)} TCGA-BRCA tumours, and the same survival statistics. Each representation's <em>selected signature</em> is the one furthest above its matched random-gene benchmark. Five controls stand between a signature and a claim:</p>
+{tbl}
+<p class="note">The technical report calls this set of controls the ladder and reads every result against all of its rungs.</p>"""
 
 
 def result_html():
     pp = {m: pv(fw_prim[m]["fw_p"]) for m in MODELS}
+    ppick = {m: pv(fw_prim[m]["pick_fw_p"]) for m in MODELS}
     ps = {m: pv(fw_sens[m]["fw_p"]) for m in MODELS}
     m2 = {m: P2C["primary"][m]["margin"] for m in FMS}
     ci2 = {m: ci(*P2C["primary"][m]["ci"]) for m in FMS}
     ms = {m: sgn(P2C["sensitivity"][m]["margin"]) for m in FMS}
-    check(all(P2C["sensitivity"][m]["ci"][0] < 0 < P2C["sensitivity"][m]["ci"][1] for m in FMS),
-          "sensitivity margins span zero")
-    clin = REF["clinical_full"]
-    f1 = (f"<p><strong>No representation beats chance selection.</strong> The planned analysis counts a signature "
-          f"only when a higher score means worse survival. There, the best of each representation's hundreds of "
-          f"signatures does no better than the best signature on shuffled survival (p = {pp['hvg_pca']} HVG-PCA, "
-          f"{pp['scgpt']} scGPT, {pp['geneformer']} Geneformer). Counting protective signatures too (an unplanned "
-          f"analysis), HVG-PCA "
-          f"(p = {ps['hvg_pca']}) and scGPT ({ps['scgpt']}) clear it; Geneformer ({ps['geneformer']}) does not, a "
-          f"borderline result {GF_Z:.1f} Monte-Carlo standard errors above 0.05.</p>")
-    f2 = (f"<p><strong>Neither foundation model is ahead of the baseline.</strong> Measured as distance above the "
-          f"random-gene floor, scGPT's pick trails the baseline's by {f3(-m2['scgpt'])} in C-index (95% interval "
-          f"{ci2['scgpt']}) and Geneformer's by {f3(-m2['geneformer'])} ({ci2['geneformer']}). Read in either "
-          f"direction the margins are {ms['scgpt']} and {ms['geneformer']}, with intervals spanning zero.</p>")
-    f3_ = (f"<p><strong>Clinical information is far ahead.</strong> Age and stage alone reach a cross-validated "
-           f"C-index of {f3(clin['cindex_cv_mean'])}. The picks reach {f3(min(PICK_C))}–{f3(max(PICK_C))} alone, "
-           f"selected on these patients; the published proliferation score, with no selection, reaches "
-           f"{f3(PROLIF['cindex'])}.</p>")
-    check(all(m2[m] < 0 for m in FMS) and all(c < clin["cindex_cv_mean"] for c in PICK_C), "result cards")
-    return f"""<h2 id="result">Headline result</h2>
-{fig("fig_ladder")}
-<div class="findings">{f1}{f2}{f3_}</div>"""
+    check(not any(fw_prim[m]["P1_corrected"] for m in MODELS), "Figure 1A: nothing clears pre-specified")
+    check([m for m in MODELS if fw_sens[m]["fw_p"] < C.ALPHA] == ["hvg_pca", "scgpt"], "Figure 1A: post hoc HVG-PCA and scGPT clear")
+    check(all(P2C["sensitivity"][m]["ci"][0] < 0 < P2C["sensitivity"][m]["ci"][1] for m in FMS), "post hoc margins span zero")
+    check(P2C["primary"]["geneformer"]["ci"][1] < 0 < P2C["primary"]["scgpt"]["ci"][1], "Figure 1B: Geneformer interval below 0, scGPT spans 0")
+    sc, hv = PICKS["primary"]["scgpt"], PICKS["primary"]["hvg_pca"]
+    check(sc["cindex"] > hv["cindex"] and sc["floor_mean"] > hv["floor_mean"], "scGPT: higher C and higher random-gene benchmark")
+    cap_a = (f"<p><strong>None of the three representations passes the selection-aware test in the pre-specified analysis.</strong> "
+             f"For each representation, {n_(N_PERM)} shuffles of the survival outcomes show how well its best signature "
+             f"could do by chance when hundreds are tested; the observed best stays inside that null.</p>"
+             f"<ul><li>These p-values belong to each representation's best survival-performing signature. The selected "
+             f"signature in Figure 1B is chosen by a different rule (distance above its random-gene benchmark) and can be "
+             f"another signature; its own p-values against the same null are {ppick['hvg_pca']} (PCA), {ppick['scgpt']} "
+             f"(scGPT) and {ppick['geneformer']} (Geneformer).</li>"
+             f"<li>Filled dots: p &lt; 0.05. The post hoc panel also counts signatures whose higher score predicts longer "
+             f"survival; it is exploratory.</li></ul>")
+    cap_b = (f"<p><strong>Neither foundation model shows a positive advantage over PCA.</strong> Each model's selected "
+             f"signature is compared with PCA's after subtracting what matched random gene sets achieve; negative values "
+             f"favour PCA.</p><ul><li>Intervals are 95% patient-bootstrap intervals that re-select the signatures in "
+             f"every resample, so they include the cost of selection.</li></ul>")
+    return f"""<h2 id="result">Result 1 · Neither foundation model outperforms PCA</h2>
+<p>Survival prediction is measured with the concordance index (C-index): of two patients, how often the one with the higher score dies first, accounting for censoring. 0.5 is chance; higher is better discrimination {cite('harrell')}.</p>
+<p><strong>No representation's best signature beats a selection-aware permutation test.</strong> In the pre-specified analysis, where a higher score must predict worse survival, p = {pp['hvg_pca']} (PCA), {pp['scgpt']} (scGPT) and {pp['geneformer']} (Geneformer). In a post hoc analysis that also counts protective signatures, PCA ({ps['hvg_pca']}) and scGPT ({ps['scgpt']}) clear the test and Geneformer ({ps['geneformer']}, {GF_Z:.1f} Monte-Carlo standard errors above 0.05) does not.</p>
+{svg_figure("fig_significance", "Does any representation beat the selection-aware null?", fig_significance(), cap_a)}
+<p><strong>The foundation models trail the baseline.</strong> Above the matched random-gene benchmark, scGPT's selected signature trails PCA's by {f3(-m2['scgpt'])} in C-index (95% interval {ci2['scgpt']}) and Geneformer's by {f3(-m2['geneformer'])} ({ci2['geneformer']}); in the post hoc reading the differences are {ms['scgpt']} and {ms['geneformer']}, with intervals spanning zero. scGPT's selected signature has the higher raw C-index ({f3(sc['cindex'])} against {f3(hv['cindex'])}), but random gene sets of the same size and expression score higher for it too ({f3(sc['floor_mean'])} against {f3(hv['floor_mean'])}), and the advantage disappears once that is subtracted.</p>
+{svg_figure("fig_advantage", "Does a foundation model improve on PCA?", fig_advantage(), cap_b)}
+<p class="note">The PCA signature in this comparison is not an idealised biological reference. It went through the same selection rule and comes from a state confined to one dataset whose markers are testis and colon genes (see <a href="#states">the selected states</a>); it was selected because its random-gene benchmark is low.</p>"""
 
 
 def added_html():
     prol = AV_PROLIF["age+stage"]["delta_cindex_cv_nested_mean"]
     prolp = AV_PROLIF["age+stage+PAM50"]["delta_cindex_cv_nested_mean"]
     nas, eas = AV_N["age+stage"]
+    clin = REF["clinical_full"]
     check(prol > 0 and prolp <= 0, "proliferation raises C over age + stage, not once PAM50 is in")
-    return f"""<h2 id="added">Added value over age and stage</h2>
-{fig("fig_added_value")}
-<p>Each pick was added to a Cox model of age and stage ({n_(nas)} patients, {eas} deaths), with the signature re-selected inside every training fold so that the selection is paid for. No pick showed a reproducible improvement: the change in cross-validated C-index ranged from {sgn(min(NESTED_PICK), 4)} to {sgn(max(NESTED_PICK), 4)}, and every pick's change spans zero across five repeats. The published proliferation score raised it by {sgn(prol)}; once PAM50 subtype was in the model its change was {sgn(prolp)}.</p>"""
+    check(max(abs(x) for x in NESTED_PICK) < 0.002, "every selected signature changes C by less than 0.002")
+    cap = ("<p><strong>No selected signature improves on age and stage.</strong> Each dot is the mean change over five "
+           "repeats of cross-validation; the signature, and its direction, are re-selected inside every training fold, so "
+           "the test patients' outcomes never influence the choice.</p>"
+           "<ul><li>Whiskers show the range across the five repeats on the same patients, not a confidence interval.</li>"
+           f"<li>Hazard ratios for these models are in the technical report ({fr('fig_added_value')}); they are nominal, "
+           "because the signatures were selected on these outcomes.</li></ul>")
+    return f"""<h2 id="added">Result 2 · No added value beyond age and stage</h2>
+<p>Age and stage alone reach a cross-validated C-index of {f3(clin['cindex_cv_mean'])} in TCGA-BRCA ({n_(nas)} patients, {eas} deaths). Adding a selected signature from PCA, scGPT or Geneformer changes it by less than 0.002 in either direction ({sgn(min(NESTED_PICK), 4)} to {sgn(max(NESTED_PICK), 4)}), and no signature improves it consistently across the five repeats. The published proliferation score, a fixed gene list with no selection, raises it by {sgn(prol)}; once PAM50 subtype is in the model its change is {sgn(prolp)}. The selected cell-state signatures therefore show no incremental prognostic value in this evaluation.</p>
+{svg_figure("fig_added", "Adding the cell-state signatures does not improve prediction beyond age and stage", fig_added(), cap)}"""
 
 
 def replication_html():
     os_ = MEND["OS"]
-    os_p = mrep(PROLIF_ID, "OS")
-    return f"""<h2 id="replication">Independent replication in METABRIC</h2>
-{fig("fig_margin")}
-<p>The signatures, their directions and the replication criterion were fixed before METABRIC outcomes were examined. In {n_(os_['n'])} METABRIC patients ({n_(os_['events'])} deaths) {cite('curtis', 'pereira')}, every foundation-model-minus-baseline margin is negative; the 95% interval lies below zero for {WORD[len(BELOW_PRIM)]} of the {WORD[len(CMP_PRIM)]} pre-specified comparisons and for all {WORD[len(CMP_SENS)]} post hoc ones. The published proliferation score replicates most strongly (overall-survival C-index {f3(os_p['cindex_oriented'])} against a random-gene 95th percentile of {f3(os_p['floor_p95'])}).</p>"""
+    os_p, ds_p = mrep(PROLIF_ID, "OS"), mrep(PROLIF_ID, "DSS")
+    gf_dss = mrep(PID["primary"]["geneformer"], "DSS")
+    check(gf_dss["replicates"] and floor_borderline(PID["primary"]["geneformer"], "DSS"), "Geneformer risk DSS: replicates, borderline")
+    check(not mrep(PID["primary"]["geneformer"], "OS")["replicates"], "Geneformer risk OS does not replicate")
+    check(all(x["margin"] < 0 for x in MCMP), "all eight METABRIC margins negative")
+    cap = ("<p><strong>Points show each foundation model's advantage over PCA after correcting for matched random-gene "
+           "performance;</strong> positive values would favour the foundation model. Filled: pre-specified; open: post hoc.</p>"
+           "<ul><li>TCGA intervals re-select signatures in each bootstrap; METABRIC intervals are paired patient bootstraps "
+           "with the signatures held fixed.</li></ul>")
+    return f"""<h2 id="replication">Result 3 · No advantage in an independent cohort</h2>
+<div class="frozen"><strong>Signatures and their directions were fixed before METABRIC outcomes were examined.</strong> No signature was re-selected in the validation cohort.</div>
+<p>In {n_(os_['n'])} METABRIC patients ({n_(os_['events'])} deaths) {cite('curtis', 'pereira')}, all {WORD[len(MCMP)]} foundation-model-minus-PCA differences are negative, for overall and disease-specific survival. The 95% interval lies entirely below zero for {WORD[len(BELOW_PRIM)]} of the {WORD[len(CMP_PRIM)]} pre-specified comparisons and for all {WORD[len(CMP_SENS)]} post hoc ones, so the validation does not support a foundation-model advantage; it does not establish that every difference is negative.</p>
+{svg_figure("fig_repl_margins", "The absence of a foundation-model advantage persists in an independent cohort", fig_replication_margins(), cap)}
+<p>Some individual signatures do replicate, and that is consistent with the comparison above. Both PCA signatures replicate on both endpoints; Geneformer's pre-specified signature meets the replication criterion for disease-specific survival by {f3(gf_dss['cindex_oriented'] - gf_dss['floor_p95'], 4)} in C-index and not for overall survival. The published proliferation score replicates most strongly (C-index {f3(os_p['cindex_oriented'])} for overall and {f3(ds_p['cindex_oriented'])} for disease-specific survival, against random-gene 95th percentiles of {f3(os_p['floor_p95'])} and {f3(ds_p['floor_p95'])}).</p>"""
 
 
 def cellstates_html():
-    rows_ = []
-    for a in ("primary", "sensitivity"):
-        for m in MODELS:
-            t, mb = SUB[(a, m)]
-            c = state_comp(PICKS[a][m])
-            auc = float(t["auc_tracked"])
-            g = GROUP[t["tracked_group"]]
-            tracks = (f"{'higher' if auc >= 0.5 else 'lower'} in {g} (AUC {f3(auc, 2)})"
-                      if (a, m) in TRACKERS else "little association")
-            rows_.append(f'<tr><td>{sw(m)}<strong>{NAME[m]}</strong><br><span class="dim2">'
-                         f'{"pre-specified" if a == "primary" else "post hoc"} · {PICKS[a][m].get("direction", "risk")}</span></td>'
-                         f'<td>{esc(programme(a, m))}</td><td>{tracks}</td>'
-                         f'<td class="num">{f3(float(t["epsilon2"]), 2)} · {f3(float(mb["epsilon2"]), 2)}</td>'
-                         f'<td class="num">{pct(float(c["top_donor_frac"]))}</td></tr>')
-    table = ('<div class="scroll"><table class="brief"><thead><tr><th>pick</th><th>programme</th>'
-             '<th>PAM50 subtype it tracks (TCGA)</th><th>ε² TCGA · METABRIC</th><th>cells from largest donor</th>'
-             '</tr></thead><tbody>' + "".join(rows_) + '</tbody></table></div>')
     d = DPR
     lo, hi = min(STAB_ARI), max(STAB_ARI)
-    return f"""<h2 id="cellstates">What the states are</h2>
-<p>Four of the six picks are tumour-cell programmes whose bulk scores follow the intrinsic subtypes of breast cancer, in TCGA and again in METABRIC. The baseline's pre-specified pick is a single-dataset artefact, and Geneformer's protective pick a stress profile.</p>
-{table}
-<p class="note">ε²: rank-based effect size of PAM50 subtype on the signature score (0: no association; the published proliferation score has {f3(float(SUB_REF[0]['epsilon2']), 2)}). AUC: probability that a tumour of that subtype scores higher than one of another subtype.</p>
-<p><strong>Secondary result: donor mixing.</strong> The foundation-model embeddings produced fewer donor-specific states than HVG-PCA ({pct(d['scgpt']['share_single_donor'])} of scGPT and {pct(d['geneformer']['share_single_donor'])} of Geneformer states draw at least {pct(C.SINGLE_DONOR_FRAC)} of their cells from one donor, against {pct(d['hvg_pca']['share_single_donor'])}). This did not translate into clearly stronger prognostic signatures: the best multi-donor state lies {f3(d['scgpt']['best_margin_multi_donor'])} (scGPT) and {f3(d['geneformer']['best_margin_multi_donor'])} (Geneformer) above its floor, against {f3(d['hvg_pca']['best_margin_multi_donor'])} for HVG-PCA; read in either direction the foundation models lead by {f3(DON_OR_AHEAD['scgpt'])} and {f3(DON_OR_AHEAD['geneformer'])}, without an interval. The clusterings are stable under donor subsampling (mean adjusted Rand index {f3(lo, 2)}–{f3(hi, 2)}).</p>"""
+    cap4 = ("<p><strong>The foundation models produce fewer donor-dominated states, and recover recognisable "
+            "breast-cancer programmes.</strong> Panel A names the selected state of each representation in the two "
+            "analyses; panel B counts every state kept for analysis, not only the selected ones.</p>"
+            "<ul><li>A lower share of donor-dominated states is not by itself a better representation: malignant cells "
+            "cluster by patient in single-cell data, so a donor-specific state can be genuine tumour biology as well as a "
+            "batch effect.</li></ul>")
+    cap7 = ("<p><strong>Tracking a breast-cancer subtype did not make a selected signature add prognostic value.</strong> "
+            "Each point is one selected signature (or the published proliferation score): its association with PAM50 "
+            "subtype against its change in cross-validated C-index over age and stage.</p>"
+            "<ul><li>Six outcome-selected points do not establish a general relationship; the subtype measure uses the "
+            "tumours with a PAM50 call and the C-index change uses the age-and-stage cohort.</li></ul>")
+    check(max(NESTED_PICK) < 0.001 < AV_PROLIF["age+stage"]["delta_cindex_cv_nested_mean"], "Figure 7: only the published score adds > 0.001")
+    check(max(float(SUB[k][0]["epsilon2"]) for k in TRACKERS) > 0.4, "Figure 7: a selected signature with eps2 above 0.4")
+    clip_note = "Shows the PCA row first; open it to see the scGPT and Geneformer rows."
+    return f"""<h2 id="cellstates">What the models actually learned</h2>
+<p>If the foundation models do not improve survival prediction, what do their cell states capture? Two things stand out: they recover recognisable breast-cancer programmes, and their states are less dominated by individual donors.</p>
+{svg_figure("fig_learned", "What kinds of cell states did the models find?", fig_learned(), cap4)}
+<p><strong>Recognisable biology.</strong> Four of the six selected signatures are tumour-cell programmes whose bulk scores follow the PAM50 intrinsic subtypes, in TCGA and again in METABRIC: scGPT's pre-specified state is an ERBB2-containing luminal epithelial programme and Geneformer's a basal keratin programme; in the post hoc reading PCA and scGPT both recover a luminal, oestrogen-responsive programme. The other two are PCA's pre-specified state, confined to one dataset, and Geneformer's post hoc state, a profile of stressed or low-quality cells.</p>
+<p><strong>Less donor-specific states.</strong> {pct(d['scgpt']['share_single_donor'])} of scGPT's and {pct(d['geneformer']['share_single_donor'])} of Geneformer's states draw at least {pct(C.SINGLE_DONOR_FRAC)} of their cells from one donor, against {pct(d['hvg_pca']['share_single_donor'])} of PCA's. This did not give clearly stronger prognostic signatures: the best state shared across donors lies {f3(d['scgpt']['best_margin_multi_donor'])} (scGPT) and {f3(d['geneformer']['best_margin_multi_donor'])} (Geneformer) above its random-gene benchmark, against {f3(d['hvg_pca']['best_margin_multi_donor'])} for PCA; read in either direction the foundation models lead by {f3(DON_OR_AHEAD['scgpt'])} and {f3(DON_OR_AHEAD['geneformer'])}, without an interval. The clusterings are stable under donor subsampling (mean adjusted Rand index {f3(lo, 2)}–{f3(hi, 2)}).</p>
+<p>{fr('fig_states')} places the selected states in each representation's two-dimensional UMAP of all {n_(N_CELLS)} cells; {fr('fig_states_all')} shows every state each representation produced, at each of three clustering resolutions ({", ".join(f"{N_STATES[m]} for {NAME[m]}" for m in MODELS)}).</p>
+{fig("fig_states")}
+{fig("fig_states_all", clip=0.36, clip_note=clip_note)}
+<p><strong>Biology without incremental clinical value.</strong> A signature can follow a known subtype closely and still add nothing beyond age and stage. Among the six selected signatures, the subtype association ranges from ε² {f3(min(float(SUB[(a, m)][0]['epsilon2']) for a in PICKS for m in MODELS), 2)} to {f3(max(float(SUB[(a, m)][0]['epsilon2']) for a in PICKS for m in MODELS), 2)}, while every change in C-index stays below 0.002. Only the published proliferation score, the most subtype-associated of all (ε² {f3(float(SUB_REF[0]['epsilon2']), 2)}), adds a measurable amount.</p>
+{svg_figure("fig_subtype_utility", "Subtype signal and clinical utility", fig_subtype_utility(), cap7)}"""
+
+
+def scope_html():
+    return f"""<h2 id="scope">What the results mean</h2>
+<p><strong>The foundation models learned different cell-state representations, but the differences did not translate into better prognostic signatures.</strong> scGPT and Geneformer produced fewer donor-dominated states than PCA, and several of their selected states are recognisable breast-cancer programmes. Their marker-gene signatures nevertheless showed no evidence of outperforming PCA's, gave no reproducible improvement over age and stage, and showed no advantage in METABRIC.</p>
+<p>This does not show that single-cell foundation models lack useful biological information. The checkpoints tested, scGPT whole-human and the 6-layer Geneformer V1, were used zero-shot; neither was pretrained on malignant cells, and cancer-adapted checkpoints such as CancerFoundation {cite('theus')} were not tested. Turning a cell state into a short marker-gene signature scored in bulk tumours discards much of the representation. The result is specific to these checkpoints, this transfer procedure and breast-cancer survival, with {N_EV} deaths in TCGA.</p>
+<p>The broader lesson is methodological: <strong>a biologically plausible representation should not be assumed to add predictive value downstream without controlled baselines and independent validation.</strong> Representation structure, biological interpretability and clinical utility need to be measured separately.</p>"""
 
 
 def novelty_html():
     keys = ["luca", "wuSZ", "chenA", "sun", "roman", "liuW", "kedzierska", "ahlmann", "bendidi", "venet"]
-    check(all(k in REFS for k in keys), "every reference cited in the novelty section is in the reference list")
+    check(all(k in REFS for k in keys), "every reference cited in the related-work section is in the reference list")
     fm_or_dirs = {r["direction_tcga"] for r in SUBT_CSV if r["cohort"] == "TCGA" and r["model"] in SENS_CLEAR
                   and "family_max_sensitivity" in r["analyses"].split(";")}
-    check(fm_or_dirs == {"protective"}, "the either-direction family maxima that clear are protective")
-    sc, hv = PICKS["primary"]["scgpt"], PICKS["primary"]["hvg_pca"]
-    check(sc["cindex"] > hv["cindex"] and sc["floor_mean"] > hv["floor_mean"] and P2C["primary"]["scgpt"]["margin"] < 0,
-          "scGPT: higher C and higher floor, negative margin")
-    return f"""<h2 id="novelty">What was known, and what this study shows</h2>
-<p>Earlier benchmarks found that simple methods match single-cell foundation models on cell-level tasks used zero-shot {cite('kedzierska')} and on perturbation prediction {cite('ahlmann', 'bendidi')}, and that foundation-model embeddings offer limited advantages for cancer patients' outcomes, whether used within single-cell cohorts {cite('roman')} or computed from bulk tumour profiles {cite('liuW')}. Carrying single-cell states into bulk cohorts to study survival is also established {cite('luca', 'wuSZ')}. This study takes a different route to the clinical question: the foundation models decide which cells form a state, and those states are carried into patients as gene signatures, beside states from a linear method treated identically. I found no earlier comparison of foundation-model and linear cell states along this route. Four observations follow, each set against what was known.</p>
+    check(fm_or_dirs == {"protective"}, "the either-direction best signatures that clear are protective")
+    return f"""<h2 id="novelty">What this study contributes</h2>
+<p>The study evaluates whether cell states found by single-cell foundation models carry survival information beyond a linear representation of the same cells. Its contribution is a controlled comparison: the downstream workflow is fixed across scGPT, Geneformer and PCA, the selection of promising signatures from hundreds of candidates is paid for, signatures are benchmarked against matched random gene sets, and the selected signatures are tested in an independent cohort. Earlier work established that single-cell states can be linked to patient outcomes {cite('luca', 'wuSZ')} and that foundation models do not consistently beat simpler baselines {cite('kedzierska', 'ahlmann', 'bendidi')}; this study connects the two by testing whether foundation-model cell states transfer into bulk-tumour prognosis, and by examining what the resulting states are.</p>
+<details class="every"><summary>Related work and how the findings compare</summary><div class="inner">
+<p>Simple methods match single-cell foundation models on cell-level tasks used zero-shot {cite('kedzierska')} and on perturbation prediction {cite('ahlmann', 'bendidi')}, and foundation-model embeddings offer limited advantages for cancer patients' outcomes, whether used within single-cell cohorts {cite('roman')} or computed from bulk tumour profiles {cite('liuW')}. Carrying single-cell states into bulk cohorts to study survival is established {cite('luca', 'wuSZ')}; here the foundation models decide which cells form a state.</p>
 <ul class="known">
 <li><strong>The models recover familiar biology.</strong> Their states include an ERBB2-associated luminal programme, a basal keratin programme and a hormone-responsive luminal programme, and their scores follow the PAM50 intrinsic subtypes, the axes that carry most prognostic information in breast cancer {cite('parker', 'wirapati')}.</li>
-<li><strong>That biology adds no survival information beyond the linear method.</strong> The linear method finds the same luminal programme, and no foundation-model state predicts survival better than the baseline's, in TCGA or in METABRIC. This extends the cell-level and patient-level findings above {cite('kedzierska', 'roman')} to states the models define themselves.</li>
-<li><strong>An apparent advantage disappears against random genes.</strong> scGPT's pick has a higher C-index than the baseline's ({f3(sc['cindex'])} against {f3(hv['cindex'])}), but random gene lists of the same size and expression also score higher for it ({f3(sc['floor_mean'])} against {f3(hv['floor_mean'])}), and the advantage is gone once that is taken into account. Random gene sets predict breast-cancer outcome {cite('venet')}, and here that background differed between the representations.</li>
-<li><strong>The signal that holds is protective.</strong> States beat chance only when signatures predicting longer survival are counted (HVG-PCA and scGPT), and the states whose associations held across cohorts in {REFS['chenA'][0]}, whose collection supplies {pct(CHEN_FRAC)} of this atlas's cells, were also protective.</li>
-</ul>"""
-
-
-def scope_html():
-    return f"""<h2 id="scope">Why it matters, and what it does not show</h2>
-<p>For drug discovery and patient stratification the result is a caution: here, states from zero-shot foundation-model embeddings did not give better prognostic signatures than a linear method applied to the same cells. The conclusion is limited to the checkpoints tested, scGPT whole-human and the 6-layer Geneformer V1, used zero-shot; neither saw malignant cells in pretraining, and cancer-adapted checkpoints such as CancerFoundation {cite('theus')} were not tested. A marker-gene signature scored in bulk tumours is a lossy projection of a cell state, so the study tests whether the states transfer into bulk prognosis, not whether the embeddings contain prognostic information. It covers one indication, breast cancer, with {N_EV} deaths in TCGA and short follow-up.</p>"""
+<li><strong>That biology shows no evidence of adding survival information beyond the linear method.</strong> The linear method finds the same luminal programme, and no foundation-model signature predicted survival better than the baseline's, in TCGA or in METABRIC. This extends the cell-level and patient-level findings above {cite('kedzierska', 'roman')} to states the models define themselves.</li>
+<li><strong>An apparent advantage disappears against random genes.</strong> Random gene sets predict breast-cancer outcome {cite('venet')}, and here that background differed between the representations.</li>
+<li><strong>The signal that holds is protective.</strong> Signatures beat chance only when those predicting longer survival are counted (PCA and scGPT), and the states whose associations held across cohorts in {REFS['chenA'][0]}, whose collection supplies {pct(CHEN_FRAC)} of this atlas's cells, were also protective.</li>
+</ul>
+<p>The full literature review is in <a href="{REPO}/blob/main/research/literature.md">research/literature.md</a>.</p></div></details>"""
 
 
 def checked_html():
-    return f"""<h2 id="checked">How the analysis was checked</h2>
-<p>The four predictions and their tests are written out in the <a href="{DESIGN_URL}">design document</a>. The code was audited against that design, and every place where the reported analysis departs from it is listed with its reason under <a href="#corrections">deviations from the design</a>. Unit tests, continuous integration and <a href="#pipeline">three reproduction tiers</a>, from the distributed results up to a rebuild from scratch, cover the code.</p>"""
+    return f"""<h2 id="checked">Research audit</h2>
+<p>The predictions were written down before any data were downloaded; post hoc analyses are labelled as such wherever they appear, and every departure from the original design is recorded with its reason. <a href="{DESIGN_URL}">Inspect the design and its deviations</a>, or open <a href="#g-audit">reproducibility and audit</a> below.</p>"""
 
 
 # ----------------------------------------------------------------------------- technical detail
+GROUPS = [
+    ("g-design", "Study design and statistical controls", "data, representations, clustering, signatures, the four predictions, the full ladder of controls",
+     ["methods", "predictions", "ladder"]),
+    ("g-biology", "Additional biological analyses", "the selected states in detail, PAM50 subtype, donor mixing, stability",
+     ["states", "subtype", "donors", "stability"]),
+    ("g-survival", "Additional survival analyses", "Cox models and hazard ratios, multivariable models, METABRIC in detail",
+     ["clinical", "metabric"]),
+    ("g-audit", "Reproducibility and audit", "deviations from the design, reproduction tiers, limits, references",
+     ["corrections", "pipeline", "limits", "refs"]),
+]
+
+
 def technical_html():
-    return """<h2 id="technical" class="divider">Technical detail</h2>
-<p class="sub">The full study: methods and controls, the predictions, every number behind the summary, the secondary analyses, the deviations from the design, and how to reproduce it.</p>"""
+    return """<h2 id="technical" class="divider">Technical report</h2>
+<p class="sub">The full study, in four groups that open on demand: methods and controls, every number behind the summary, the secondary analyses, the deviations from the design, and how to reproduce it.</p>
+<p class="note">Terms used in the technical report: <em>pick</em> = a representation's selected signature; <em>floor</em> = its matched random-gene benchmark; <em>family-wise null</em> = the selection-aware permutation test; <em>family maximum</em> = the best survival-performing signature of a representation; <em>nested ΔC</em> = the change in cross-validated C-index with the signature re-selected inside every training fold; <em>sensitivity analysis</em> = the post hoc reading in which a signature may be risk or protective.</p>"""
 
 
 def methods_html():
@@ -1181,7 +1525,8 @@ def ladder_html():
               '<th>P2 margin, pre-specified (95% interval)</th></tr></thead>'
               '<tbody>' + "".join(prow) + "</tbody></table></div>")
     return f"""<h2 id="ladder">The ladder in detail</h2>
-<p class="sub">{fr('fig_ladder')} in numbers, the either-direction reading, the progression-free interval and the ladder at each setting. Family-wise p-values are from {n_(N_PERM)} outcome permutations.</p>
+<p class="sub">Every rung for every representation in one figure ({fr('fig_ladder')}; {fr('fig_significance')} and {fr('fig_advantage')} in the summary are drawn from it), then the numbers, the either-direction reading, the progression-free interval and the ladder at each setting. Family-wise p-values are from {n_(N_PERM)} outcome permutations.</p>
+{fig("fig_ladder")}
 <h3>Pre-specified direction</h3>
 {pre}
 {per_setting}
@@ -1222,17 +1567,14 @@ def states_html():
     b = PICKS["primary"]["hvg_pca"]
     share = {k: pct(float(state_comp(PICKS[a][m])["top_donor_frac"])) for k, (a, m) in
              {"gf": ("primary", "geneformer"), "hs": ("sensitivity", "hvg_pca"), "hp": ("primary", "hvg_pca")}.items()}
-    return f"""<h2 id="states">The picked states</h2>
+    return f"""<h2 id="states">The selected states in detail</h2>
 <p class="sub">Each representation's pick is the state whose signature lies furthest above its own random-gene floor: in the risk direction for the pre-specified analysis, in either direction for the sensitivity analysis. Composition is from the {n_(N_CELLS)}-cell atlas; markers are ranked by a Wilcoxon test of the state against all other cells.</p>
 {table}
 <p class="note">Composition: donors and datasets with, in brackets, the share of the state's cells from the largest one, then the most frequent annotated cell type and its share. A state is flagged single-donor when one donor supplies at least {pct(C.SINGLE_DONOR_FRAC)} of its cells. ER, PR: oestrogen and progesterone receptor; HER2: the ERBB2 gene product.</p>
 <p><strong>Most picks are tumour-cell programmes that follow the intrinsic subtypes.</strong> In the risk direction, scGPT's pick is an ERBB2-containing luminal epithelial programme and Geneformer's a basal keratin programme. In the protective direction, HVG-PCA and scGPT both recover a luminal, oestrogen-responsive programme (GATA3, XBP1, AZGP1, TRPS1 in both lists). Their marker lists contain genes of the subtype axes that carry most prognostic information in breast cancer {cite("wirapati")}, and their bulk scores track PAM50 subtype (next section). Malignant cells cluster by patient in single-cell data {cite("tirosh")}: Geneformer's pre-specified pick ({share['gf']} of its cells from one donor) and HVG-PCA's sensitivity pick ({share['hs']}) are essentially one patient's tumour cells, and HVG-PCA's pre-specified pick ({share['hp']}) is the single-dataset state below.</p>
 <p><strong>The baseline's pre-specified pick is a single-dataset artefact.</strong> Its cells are annotated as exhausted T cells, yet its markers are testis and colon genes (CEACAM7, TKTL1, FAM9C, INSL3), and none of the canonical T-cell markers ({", ".join(T_CELL_GENES)}) is among its 50 genes; it does include {", ".join(BASE_EXTRA_GENES["treg"])}, a regulatory-T-cell transcription factor, and the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}. It was picked because its random-gene floor is low ({f3(b["floor_mean"])}), which makes its margin large although its C-index ({f3(b["cindex"])}) is not. The pre-specified P2 margins are measured against it.</p>
 <p><strong>Geneformer's protective pick is a mixed-lineage state.</strong> Its markers are nuclear-retained transcripts and immediate-early genes, the profile of low-quality or dissociation-stressed cells.</p>
-<p>{fr('fig_states')} places the picks in each representation's two-dimensional uniform manifold approximation and projection (UMAP) of all {n_(N_CELLS)} cells.</p>
-{fig("fig_states")}
-<p>{fr('fig_states_all')} shows every state each representation produced, at each of the three clustering resolutions: {", ".join(f"{N_STATES[m]} for {NAME[m]}" for m in MODELS)}. The picks above are one state each out of these.</p>
-{fig("fig_states_all")}"""
+<p>The UMAP figures of these states are in the summary: {fr('fig_states')} and {fr('fig_states_all')}.</p>"""
 
 
 def subtype_html():
@@ -1337,6 +1679,7 @@ def clinical_html():
     pam_set, pam_base = SM["clinical_pam50"], SM["clinical_on_pam50_set"]
     return f"""<h2 id="clinical">Clinical information</h2>
 <p class="sub">Each pick is added to a Cox proportional-hazards model of age and stage ({n_(nas)} patients, {eas} deaths) and to age, stage and PAM50 subtype ({n_(nap)} patients, {eap} deaths); {fr('fig_added_value')} shows the result. The ladder's C-indices are of the score alone; this section asks whether the score improves on what a clinician already has.</p>
+{fig("fig_added_value")}
 <p>Age and stage alone reach a cross-validated C-index of {f3(clin['cindex_cv_mean'])} ({n_(clin['n'])} patients); the PAM50 subtype call alone reaches {f3(pam['cindex_cv_mean'])} ({n_(pam['n'])} patients). In this cohort PAM50 subtype does not raise the cross-validated C of age and stage either ({f3(pam_set['cindex_mean'])} against {f3(pam_base['cindex_mean'])} on the {n_(pam_set['n'])} patients with a call), so the test has little room to show added value.</p>
 <p>The hazard ratios in {fr('fig_added_value')} are nominal: every pick was chosen on the outcomes of these patients. The change in cross-validated C-index repeats the selection, and the choice of direction, inside every training fold, so it carries no selection. On that measure every pick's change in C spans zero across the five repeats. The luminal protective picks of HVG-PCA and scGPT keep nominal hazard ratios below 1 with PAM50 in the model ({f3(lum[1]["hr_per_sd"], 2)} and {f3(lum[3]["hr_per_sd"], 2)} per standard deviation), but under nested selection they do not raise the cross-validated C-index. The published proliferation score (a fixed, published gene list, so free of selection) raises it by {sgn(prol["delta_cindex_cv_nested_mean"])} over age and stage; once PAM50 is in the model its change is {sgn(prolp["delta_cindex_cv_nested_mean"])}. Of the family maxima, only HVG-PCA's either-direction maximum raises it under nested selection ({sgn(FAMMAX_HVG_AS)}), and not once PAM50 is in the model.</p>
 <h3>All of a representation's states at once</h3>
@@ -1404,7 +1747,7 @@ def metabric_html():
 <p>METABRIC {cite("curtis", "pereira")} is an expression-microarray cohort with long follow-up: {n_(os_['n'])} patients, {n_(os_['events'])} deaths (OS). Disease-specific survival (DSS) is the secondary endpoint; it censors deaths from other causes, leaving {n_(ds_['events'])} events. Twelve signatures were frozen with their genes and TCGA directions: the six picks, the family maxima and the proliferation reference. A signature replicates on an endpoint if its C, read in the TCGA direction, exceeds the 95th percentile of its METABRIC floor and its age-adjusted hazard ratio, stratified by METABRIC cohort, points in the TCGA direction with p &lt; {C.ALPHA}.</p>
 {fig("fig_replication")}
 {table}
-<p><strong>The replication shows no foundation-model advantage</strong> ({fr('fig_margin')}). The published proliferation score replicates most strongly (OS C = {f3(os_p['cindex_oriented'])} against a floor 95th percentile of {f3(os_p['floor_p95'])}; DSS C = {f3(ds_p['cindex_oriented'])}). Both HVG-PCA picks replicate. Of the foundation-model picks only Geneformer's risk pick meets the criterion, on DSS and by {sgn(gap(gf, 'DSS'), 4)}, within Monte-Carlo error of the floor p95. Within luminal A tumours scGPT's protective pick has C = {f3(lumA['cindex_oriented'])} with outcome-permutation p = {pv(lumA['perm_p'])}; no random-gene floor was computed within subtypes, so this is a result, not a pre-specified replication. Geneformer's protective pick does not replicate.</p>
+<p><strong>The replication shows no foundation-model advantage</strong> ({fr('fig_repl_margins')}). The published proliferation score replicates most strongly (OS C = {f3(os_p['cindex_oriented'])} against a floor 95th percentile of {f3(os_p['floor_p95'])}; DSS C = {f3(ds_p['cindex_oriented'])}). Both HVG-PCA picks replicate. Of the foundation-model picks only Geneformer's risk pick meets the criterion, on DSS and by {sgn(gap(gf, 'DSS'), 4)}, within Monte-Carlo error of the floor p95. Within luminal A tumours scGPT's protective pick has C = {f3(lumA['cindex_oriented'])} with outcome-permutation p = {pv(lumA['perm_p'])}; no random-gene floor was computed within subtypes, so this is a result, not a pre-specified replication. Geneformer's protective pick does not replicate.</p>
 <p><strong>Random gene sets predict survival in METABRIC.</strong> With {n_(os_['events'])} deaths, the matched-random floors have 95th percentiles of {f3(FLOOR_RANGE[0], 2)}–{f3(FLOOR_RANGE[1], 2)}. Some signatures have hazard-ratio p-values below 10<sup>{MINUS}5</sup> and still do not beat random genes: {hi_txt}. This is the effect described by {REFS["venet"][0]}.</p>
 <p><strong>The baseline's artefact pick replicates on both endpoints.</strong> Why it replicates was not examined; its 50 genes include the cell-cycle genes {" and ".join(BASE_EXTRA_GENES["cycle"])}.</p>"""
 
@@ -1544,10 +1887,21 @@ def refs_html():
 <ol class="refs">{"".join(out)}</ol>"""
 
 
-SUMMARY = [question_html, benchmark_html, result_html, added_html, replication_html, cellstates_html, novelty_html,
-           scope_html, checked_html]
-TECHNICAL = [technical_html, methods_html, predictions_html, ladder_html, states_html, subtype_html, donors_html,
-             stability_html, clinical_html, metabric_html, corrections_html, pipeline_html, limits_html, refs_html]
+SUMMARY = [question_html, benchmark_html, result_html, added_html, replication_html, cellstates_html, scope_html,
+           novelty_html, checked_html]
+SECTION_FN = {"methods": methods_html, "predictions": predictions_html, "ladder": ladder_html, "states": states_html,
+              "subtype": subtype_html, "donors": donors_html, "stability": stability_html, "clinical": clinical_html,
+              "metabric": metabric_html, "corrections": corrections_html, "pipeline": pipeline_html,
+              "limits": limits_html, "refs": refs_html}
+
+
+def technical_body():
+    out = [technical_html()]
+    for gid, title, blurb, secs in GROUPS:
+        out.append(f'<details class="group" id="{gid}"><summary><span class="gt">{title}</span>'
+                   f'<span class="gd">{blurb}</span></summary><div class="ginner">'
+                   + "\n".join(SECTION_FN[s]() for s in secs) + "</div></details>")
+    return "\n".join(out)
 
 
 # ----------------------------------------------------------------------------- page
@@ -1574,7 +1928,7 @@ NAV_JS = """
   const heads=[...byId.keys()].map(id=>document.getElementById(id)).filter(Boolean);
   const mark=()=>{
     const y=nav.offsetHeight+24; let cur=null;
-    for(const h of heads){ if(h.getBoundingClientRect().top<=y) cur=h; else break; }
+    for(const h of heads){ if(!h.offsetParent) continue; if(h.getBoundingClientRect().top<=y) cur=h; else break; }
     links.forEach(a=>{a.classList.remove('active');a.removeAttribute('aria-current');});
     tb.classList.remove('active');
     if(cur){const a=byId.get(cur.id);a.classList.add('active');a.setAttribute('aria-current','true');
@@ -1584,7 +1938,25 @@ NAV_JS = """
   addEventListener('scroll',mark,{passive:true}); addEventListener('resize',mark); mark();
 })();
 (()=>{
-  const boxes=[...document.querySelectorAll('.scroll,.imgscroll,.svgscroll')];
+  document.documentElement.classList.add('js');
+  // a link or a URL hash pointing inside a closed group opens it
+  const reveal=id=>{const el=document.getElementById(id); if(!el) return;
+    let d=el.closest('details'); while(d){d.open=true; d=d.parentElement.closest('details');}};
+  document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',()=>reveal(a.getAttribute('href').slice(1))));
+  if(location.hash) reveal(location.hash.slice(1));
+  addEventListener('hashchange',()=>reveal(location.hash.slice(1)));
+  // partially collapsed figures: show `data-frac` of the image height until opened
+  document.querySelectorAll('.clip').forEach(c=>{
+    const img=c.querySelector('img'), btn=c.nextElementSibling, frac=parseFloat(c.dataset.frac);
+    const set=()=>{c.style.maxHeight=c.classList.contains('closed')?(img.clientHeight*frac)+'px':'none';};
+    c.classList.add('closed'); btn.setAttribute('aria-expanded','false');
+    btn.addEventListener('click',()=>{const open=c.classList.toggle('closed')===false; c.classList.toggle('open',open);
+      btn.setAttribute('aria-expanded',String(open)); btn.textContent=open?'Show less':'Show the full figure'; set();});
+    if(img.complete) set(); else img.addEventListener('load',set); addEventListener('resize',set);
+  });
+})();
+(()=>{
+  const boxes=[...document.querySelectorAll('.scroll,.imgscroll,.svgscroll,.svgfit')];
   boxes.forEach(b=>{let n=b.nextElementSibling;
     if(!(n&&n.classList.contains('swipe'))){n=document.createElement('p');n.className='swipe';
       n.textContent='Wide: scroll sideways to see all of it.';b.after(n);}});
@@ -1779,18 +2151,58 @@ details.every[open]>summary::after{{content:"hide"}}
 details.every>summary:focus-visible,a:focus-visible{{outline:2px solid var(--scgpt);outline-offset:2px}}
 details.every .inner{{padding:0 13px 13px}}
 code{{font-family:var(--mono);font-size:.9em;background:#EDEFF1;padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}}
+.lede{{font-size:18px;line-height:1.5;margin:0 0 18px;max-width:62ch;text-wrap:pretty}}
+.stats{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}}
+.stats div{{background:var(--panel);border:1px solid var(--rule);border-top:3px solid var(--ink);border-radius:3px;padding:12px 14px}}
+.stats b{{display:block;font-size:28px;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums}}
+.stats span{{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--muted)}}
+@media (max-width:640px){{.stats{{grid-template-columns:minmax(0,1fr)}}}}
+.abstract p{{font-size:15px;line-height:1.6;margin:0 0 12px}}
+.scopenote{{font-size:13.5px;color:var(--muted);margin:0 0 16px}}
+.frozen{{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--ink);border-radius:0 3px 3px 0;
+  padding:10px 14px;font-size:14px;margin:0 0 14px}}
+.svgfit{{overflow-x:auto}}
+.svgfit svg{{width:100%;height:auto;display:block}}
+@media (max-width:640px){{.svgfit svg{{min-width:640px}}}}
+table.ctrl td{{white-space:normal}}
+table.ctrl td:first-child{{min-width:170px;width:220px}}
+table.ctrl td:nth-child(2){{min-width:280px}}
+.clip{{position:relative}}
+.clip.closed{{overflow:hidden}}
+.clip.closed::after{{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;
+  background:linear-gradient(to bottom,rgba(255,255,255,0),var(--panel))}}
+.cliptoggle{{display:none;font:inherit;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink);
+  background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px 12px;margin:8px 0 0;cursor:pointer}}
+.cliptoggle:hover{{border-color:var(--ink)}}
+.clipnote{{display:none;font-size:12px;color:var(--muted);margin:6px 0 0}}
+.js .cliptoggle,.js .clipnote{{display:inline-block}}
+.js .clip.open+.cliptoggle+.clipnote{{display:none}}
+details.group{{border:1px solid var(--rule);border-radius:3px;background:var(--panel);margin:14px 0}}
+details.group>summary{{cursor:pointer;list-style:none;padding:14px 18px;display:flex;flex-direction:column;gap:2px}}
+details.group>summary::-webkit-details-marker{{display:none}}
+details.group>summary .gt{{font-size:17px;font-weight:640}}
+details.group>summary .gt::before{{content:"\\25B8\\00a0";color:var(--muted)}}
+details.group[open]>summary .gt::before{{content:"\\25BE\\00a0"}}
+details.group>summary .gd{{font-size:13px;color:var(--muted)}}
+details.group>summary:focus-visible{{outline:2px solid var(--scgpt);outline-offset:2px}}
+details.group .ginner{{padding:0 18px 18px;border-top:1px solid var(--rule)}}
+details.group .ginner h2:first-child{{margin-top:28px}}
+details.group[id]{{scroll-margin-top:74px}}
+.topnav ul.sub li.gh a{{color:var(--ink);font-weight:600}}
 footer{{margin-top:64px;padding-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.8}}
 footer a{{color:var(--ink)}}
 @media (prefers-reduced-motion:reduce){{*{{scroll-behavior:auto!important}}}}
 """
 
-NAV_SUMMARY = [("question", "Question"), ("benchmark", "Benchmark"), ("result", "Result"), ("added", "Added value"),
-               ("replication", "Replication"), ("cellstates", "States"), ("novelty", "Known & new"), ("scope", "Scope"),
-               ("checked", "Checks")]
-NAV_TECH = [("technical", "Technical detail"), ("methods", "Methods"), ("predictions", "Predictions"),
-            ("ladder", "Ladder in detail"), ("states", "Picked states"), ("subtype", "PAM50 subtype"),
-            ("donors", "Donor mixing"), ("stability", "Stability"), ("clinical", "Clinical"), ("metabric", "METABRIC"),
-            ("corrections", "Deviations"), ("pipeline", "Reproduction"), ("limits", "Limits"), ("refs", "References")]
+NAV_SUMMARY = [("question", "Question"), ("benchmark", "Benchmark"), ("result", "Result 1"), ("added", "Result 2"),
+               ("replication", "Result 3"), ("cellstates", "What they learned"), ("scope", "Meaning"),
+               ("novelty", "Contribution"), ("checked", "Audit")]
+NAV_SECTION_TITLE = {"methods": "Methods", "predictions": "Predictions", "ladder": "Ladder in detail",
+                     "states": "Selected states", "subtype": "PAM50 subtype", "donors": "Donor mixing",
+                     "stability": "Stability", "clinical": "Clinical models", "metabric": "METABRIC",
+                     "corrections": "Deviations", "pipeline": "Reproduction", "limits": "Limits", "refs": "References"}
+NAV_TECH = [("technical", "Technical report")] + [x for gid, title, _, secs in GROUPS
+                                                   for x in [(gid, title)] + [(s, NAV_SECTION_TITLE[s]) for s in secs]]
 
 
 def visible_text(h):
@@ -1811,12 +2223,13 @@ def prose_words(h):
 def build():
     today = date.today()
     summary = "\n".join([header_html(today)] + [f() for f in SUMMARY])
-    technical = "\n".join(f() for f in TECHNICAL)
+    technical = technical_body()
     body = summary + "\n" + technical
-    ids = re.findall(r'<h2 id="([^"]+)"', body)
+    ids = re.findall(r'<(?:h2|details class="group") id="([^"]+)"', body)
     check(ids == [a for a, _ in NAV_SUMMARY + NAV_TECH], f"navbar sections match the page sections: {ids}")
     figs = re.findall(r'<figure class="result" id="([^"]+)"', body)
-    check(figs == sorted(FIGNO, key=FIGNO.get), f"figures appear in their numbered order: {figs}")
+    order = lambda k: (int(str(FIGNO[k]).rstrip("AB")), str(FIGNO[k]))
+    check(figs == sorted(FIGNO, key=order), f"figures appear in their numbered order: {figs}")
     vis = visible_text(body)
     bad = [w for w in ("rather than", "instead of", "by contrast", "not assumed", "adds nothing", "commit", "registry",
                        "first run", ".json", "run log", "sha256", "revision", "built by", "as coded")
@@ -1824,13 +2237,19 @@ def build():
     check(not bad, f"forbidden phrases on the page: {bad}")
     check(not re.search(r"\badds? to\b", vis) or "no reproducible" in vis, "'adds to' only with 'no reproducible'")
     n_sum = prose_words(summary.split("</header>", 1)[1])
-    n_abs = len(visible_text(re.search(r'<p class="abstract">(.*?)</p>', summary, re.S).group(1)).split())
-    check(110 <= n_abs <= 150, f"abstract is 110-150 words ({n_abs})")
+    n_abs = len(visible_text(re.search(r'<div class="abstract">(.*?)</div>', summary, re.S).group(1)).split())
+    n_lede = len(visible_text(re.search(r'<p class="lede">(.*?)</p>', summary, re.S).group(1)).split())
+    check(n_lede <= 45 and 120 <= n_abs <= 190, f"lede <= 45 words ({n_lede}), abstract 120-190 words ({n_abs})")
+    # the summary uses plain terms; the technical report defines and uses the short ones
+    jargon = [w for w in ("pick", "floor", "family-wise", "family max", "ΔC", "P1 ", "P2 ", "P3 ")
+              if re.search(rf"\b{re.escape(w)}", visible_text(summary.split("</header>", 1)[1]))]
+    check(not jargon, f"technical terms in the summary: {jargon}")
     nav = ('<li class="grp">Summary</li>' + "".join(f'<li><a href="#{a}">{t}</a></li>' for a, t in NAV_SUMMARY)
            + '<li class="tech"><button class="techbtn" type="button" aria-expanded="false" aria-controls="techlist">'
-           'Technical detail</button><ul class="sub" id="techlist">'
-           + '<li class="grp">Technical detail</li>'
-           + "".join(f'<li><a href="#{a}">{"Overview" if a == "technical" else t}</a></li>' for a, t in NAV_TECH)
+           'Technical report</button><ul class="sub" id="techlist">'
+           + '<li class="grp">Technical report</li>'
+           + "".join(f'<li{" class=gh" if a.startswith("g-") else ""}><a href="#{a}">{"Overview" if a == "technical" else t}</a></li>'
+                     for a, t in NAV_TECH)
            + '</ul></li>')
     html_ = f"""<title>Cell states and survival</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">

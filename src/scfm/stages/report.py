@@ -37,6 +37,8 @@ FIGURES = ["fig_ladder", "fig_states", "fig_states_all", "fig_added_value", "fig
            "fig_km",
            "fig_margin", "fig_subtype", "fig_donor"]
 ANALYSIS_NAME = {"primary": "Pre-specified", "sensitivity": "Sensitivity (post hoc)"}
+# how fig_states labels the selected state of each analysis (plain terms, as on the project page)
+STATE_LABEL = {"primary": "Pre-specified selection", "sensitivity": "Post hoc selection"}
 
 # Programme of each pick, from its marker genes, donor and dataset composition. Each entry names the
 # pick it describes and genes that must be in its signature, so a change in the picks fails loudly.
@@ -278,7 +280,7 @@ def fig_states(D, out):
             nd, nds = int(c["n_donors"]), int(c["n_datasets"])
             donors = f"{nd} donor" if nd == 1 else f"{nd} donors ({c['top_donor_frac']:.0%} from one)"
             ds = "1 dataset" if nds == 1 else f"{nds} datasets ({c['top_dataset_frac']:.0%} from one)"
-            text = (f"{ANALYSIS_NAME[analysis].split(' ')[0]} pick\n"
+            text = (f"{STATE_LABEL[analysis]}\n"
                     f"{programme(analysis, m, r['key'], D['sigs'])}\n"
                     f"{int(c['n_cells']):,} cells from {donors}\n{ds}")
             ax.annotate(text, xy=cen, xytext=(x, y), textcoords="axes fraction", ha=ha, va=va,
@@ -849,13 +851,13 @@ def describe(D, paths: dict, km: dict | None) -> list[dict]:
                 f"are from {L['family_wise_10k']['n_perm']:,} outcome permutations."],
             "data_files": [f["ladder"]]},
         "fig_states": {
-            "title": "Where the picked states sit in each representation",
-            "question": "What are the picked cell states, and are they shared programmes or single "
+            "title": "Where the selected states sit in each representation",
+            "question": "What are the selected cell states, and are they shared programmes or single "
                         "patients' cells?",
             "shows": "Uniform manifold approximation and projection (UMAP) of all atlas cells per "
-                     "representation (grey), the pre-specified pick in the representation's colour and the "
-                     "sensitivity pick in a lighter tint, each labelled with its programme, cell count, "
-                     "donors (top-donor share) and datasets (top-dataset share).",
+                     "representation (grey), the pre-specified selected state in the representation's colour "
+                     "and the post hoc selected state in a lighter tint, each labelled with its programme, "
+                     "cell count, donors (top-donor share) and datasets (top-dataset share).",
             "how_to_read": ["Each panel is its own embedding; positions are not comparable across panels.",
                             "A top-donor share near 100% means the state is one patient's cells."],
             "programme_labels": labels,
