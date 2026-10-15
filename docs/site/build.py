@@ -2265,6 +2265,7 @@ def build():
 <footer>
 <div>Data: CELLxGENE Census release {C.CENSUS_VERSION} (breast-carcinoma donors, primary data) · TCGA-BRCA from UCSC Xena {cite('goldman')}, survival from the TCGA Pan-Cancer Clinical Data Resource {cite('liuJ')} · METABRIC from the cBioPortal datahub. Data are downloaded at run time and not redistributed.</div>
 <div>Code: <a href="{REPO}">single-cell-fm-probing</a> · <a href="{DESIGN_URL}">design document</a></div>
+<div>More of what I am working on is at <a href="https://natalija-stepurko.com">natalija-stepurko.com</a>.</div>
 </footer>
 </div>
 <script>{NAV_JS}</script>
