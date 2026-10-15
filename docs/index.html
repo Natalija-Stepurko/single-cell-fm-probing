@@ -76,6 +76,11 @@ h1{font-size:clamp(25px,3.4vw,36px);line-height:1.15;letter-spacing:-.02em;margi
   border:1px solid var(--rule);border-radius:2px;padding:4px 9px;white-space:nowrap}
 .repo:hover .repo-path{border-color:var(--ink)}
 @media (max-width:640px){.repo .repo-path{flex-basis:100%;text-align:center;white-space:normal;overflow-wrap:anywhere}}
+.repos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.repos{grid-template-columns:minmax(0,1fr)}}
+.repos .repo{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;align-content:start}
+.repos .repo svg{grid-row:1/3;margin-top:2px}
+.repos .repo .repo-path{justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 ul.ctl,ul.known{padding-left:20px;margin:0 0 14px}
 ul.ctl li,ul.known li{margin:0 0 8px}
 h2.divider{font-size:26px;margin:96px 0 8px;padding-top:26px;border-top:2px solid var(--ink)}
@@ -248,7 +253,10 @@ footer a{color:var(--ink)}
 <p class="byline"><span class="nw">Natalija Stepurko</span> · <span class="nw">October 2026</span> · <a class="nw" href="https://natalija-stepurko.com">natalija-stepurko.com</a></p>
 <div class="abstract"><p><strong>Can representations learned from millions of single cells find clinically useful tumour cell states that a linear method misses?</strong> I compared two single-cell foundation models, scGPT and Geneformer, with a principal-component baseline on the same atlas of 50,002 breast-cancer cells. Each representation was clustered into cell states, each state became a marker-gene signature, and every signature was tested against patient survival in TCGA-BRCA.</p><p><strong>Neither foundation model showed an advantage over the baseline.</strong> In the planned analysis no representation's best survival association exceeded a selection-aware permutation test; the signatures did not reproducibly improve prediction beyond age and stage; and the lack of a foundation-model advantage held in an independent METABRIC cohort with every signature fixed in advance.</p><p>The models did differ in what they represented: their cell states were less dominated by single donors than the baseline's. The study separates that difference in representation from an improvement in clinical usefulness, which it did not find.</p></div>
 <p class="scopenote"><strong>Scope.</strong> The study evaluates marker-gene signatures from two zero-shot checkpoints, not everything their embeddings encode.</p>
+<div class="repos">
 <a class="repo" href="https://github.com/Natalija-Stepurko/single-cell-fm-probing"><svg viewBox="0 0 16 16" aria-hidden="true" width="17" height="17"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg><span><b>All the code is public.</b> Every number and figure on this page comes from the pipeline in this repository: atlas assembly, embeddings, the controls and the METABRIC replication.</span><span class="repo-path">Natalija-Stepurko/single-cell-fm-probing</span></a>
+<a class="repo" href="https://natalija-stepurko.com"><svg viewBox="0 0 16 16" aria-hidden="true" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.6"/><path d="M1.4 8h13.2M8 1.4c1.9 2 2.8 4.2 2.8 6.6S9.9 12.6 8 14.6M8 1.4C6.1 3.4 5.2 5.6 5.2 8s.9 4.6 2.8 6.6"/></svg><span><b>More of my work.</b> Other studies and what I am working on now.</span><span class="repo-path">natalija-stepurko.com</span></a>
+</div>
 </header>
 <h2 id="question">The question</h2>
 <p>Single-cell foundation models such as scGPT (Cui et al. 2024) and Geneformer (Theodoris et al. 2023) are pretrained on tens of millions of cells, and a common claim is that they learn cell biology that a linear analysis of the same data misses. For drug discovery and patient stratification the test that matters is whether that biology separates patients by outcome. This study asks whether cell states defined by these two models in a tumour atlas, carried into patient cohorts as marker-gene signatures, predict breast-cancer survival better than states from a linear baseline.</p>
@@ -415,7 +423,6 @@ make reproduce &amp;&amp; make verify             # tier A, then compare checksu
 <footer>
 <div>Data: CELLxGENE Census release 2025-11-08 (breast-carcinoma donors, primary data) · TCGA-BRCA from UCSC Xena (Goldman et al. 2020), survival from the TCGA Pan-Cancer Clinical Data Resource (Liu J et al. 2018) · METABRIC from the cBioPortal datahub. Data are downloaded at run time and not redistributed.</div>
 <div>Code: <a href="https://github.com/Natalija-Stepurko/single-cell-fm-probing">single-cell-fm-probing</a> · <a href="https://github.com/Natalija-Stepurko/single-cell-fm-probing/blob/main/docs/DESIGN.md">design document</a></div>
-<div>More of what I am working on is at <a href="https://natalija-stepurko.com">natalija-stepurko.com</a>.</div>
 </footer>
 </div>
 <script>
